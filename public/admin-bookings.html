@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة الحجوزات - Karawan Cinema</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .admin-wrap {
+      max-width: 1100px;
+      margin: 30px auto;
+      padding: 0 16px;
+    }
+
+    .admin-card {
+      background: #111827;
+      border: 1px solid #263043;
+      border-radius: 14px;
+      padding: 16px;
+      overflow-x: auto;
+    }
+
+    .admin-title {
+      margin-bottom: 12px;
+    }
+
+    .bookings-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 900px;
+    }
+
+    .bookings-table th,
+    .bookings-table td {
+      border-bottom: 1px solid #253043;
+      padding: 10px 8px;
+      text-align: right;
+      color: #e5e7eb;
+      font-size: 14px;
+      vertical-align: top;
+    }
+
+    .bookings-table th {
+      color: #93c5fd;
+      font-weight: 700;
+    }
+
+    .status-msg {
+      margin: 10px 0 0;
+      color: #fbbf24;
+    }
+
+    .admin-actions {
+      margin-bottom: 14px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+    }
+
+    .admin-actions input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #0b1220;
+      color: #e5e7eb;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .btn-add {
+      background: #22c55e;
+      color: #04130a;
+    }
+
+    .btn-delete {
+      background: #ef4444;
+      color: #fff;
+      padding: 7px 10px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .auth-card {
+      max-width: 460px;
+      margin: 30px auto;
+      background: #111827;
+      border: 1px solid #263043;
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .auth-card h3 {
+      margin-bottom: 12px;
+    }
+
+    .auth-form {
+      display: grid;
+      gap: 10px;
+    }
+
+    .auth-form input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #0b1220;
+      color: #e5e7eb;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <h1 class="logo">Karawan Cinema 🎬</h1>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="booking.html">Booking</a></li>
+      <li><a href="admin-bookings.html">Admin Bookings</a></li>
+    </ul>
+  </nav>
+  <button class="back-nav-btn" type="button" onclick="if (history.length > 1) { history.back(); } else { window.location.href='index.html'; }">⟵ رجوع</button>
+
+  <section id="authSection" class="auth-card">
+    <h3>تسجيل دخول الأدمن</h3>
+    <form id="authForm" class="auth-form">
+      <input id="adminEmail" type="email" placeholder="Admin Email" required>
+      <input id="adminPassword" type="password" placeholder="Password" required>
+      <button class="btn btn-add" type="submit">دخول</button>
+    </form>
+    <p id="authMsg" class="status-msg"></p>
+  </section>
+
+  <section id="adminSection" class="admin-wrap hidden">
+    <h2 class="admin-title">الحجوزات المسجلة</h2>
+    <button id="logoutBtn" class="btn btn-delete" type="button" style="margin-bottom: 12px;">تسجيل خروج</button>
+    <div class="admin-card">
+      <form id="addBookingForm" class="admin-actions">
+        <input id="movieInput" type="text" placeholder="اسم الفيلم" required>
+        <input id="showtimeInput" type="text" placeholder="الحفلة (مثال 07:00 PM)" required>
+        <input id="nameInput" type="text" placeholder="اسم العميل" required>
+        <input id="phoneInput" type="tel" placeholder="رقم الموبايل" required>
+        <input id="seatsInput" type="text" placeholder="المقاعد (مثال A1,A2)" required>
+        <button class="btn btn-add" type="submit">إضافة حجز</button>
+      </form>
+
+      <table class="bookings-table">
+        <thead>
+          <tr>
+            <th>وقت التسجيل</th>
+            <th>الفيلم</th>
+            <th>الحفلة</th>
+            <th>العميل</th>
+            <th>الموبايل</th>
+            <th>المقاعد</th>
+            <th>عدد التذاكر</th>
+            <th>الإجمالي</th>
+            <th>تحكم</th>
+          </tr>
+        </thead>
+        <tbody id="bookingsBody">
+          <tr>
+            <td colspan="9">جاري تحميل الحجوزات...</td>
+          </tr>
+        </tbody>
+      </table>
+      <p id="statusMsg" class="status-msg"></p>
+    </div>
+  </section>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="firebase.js"></script>
+  <script>
+    const db = window.db;
+    const isFirebaseConfigured = window.isFirebaseConfigured;
+    const auth = firebase.auth();
+    const authSection = document.getElementById("authSection");
+    const adminSection = document.getElementById("adminSection");
+    const authForm = document.getElementById("authForm");
+    const adminEmail = document.getElementById("adminEmail");
+    const adminPassword = document.getElementById("adminPassword");
+    const authMsg = document.getElementById("authMsg");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const addBookingForm = document.getElementById("addBookingForm");
+    const movieInput = document.getElementById("movieInput");
+    const showtimeInput = document.getElementById("showtimeInput");
+    const nameInput = document.getElementById("nameInput");
+    const phoneInput = document.getElementById("phoneInput");
+    const seatsInput = document.getElementById("seatsInput");
+    const bookingsBody = document.getElementById("bookingsBody");
+    const statusMsg = document.getElementById("statusMsg");
+    let unsubscribeBookings = null;
+
+    function showAdminUI() {
+      authSection.classList.add("hidden");
+      adminSection.classList.remove("hidden");
+    }
+
+    function showAuthUI() {
+      adminSection.classList.add("hidden");
+      authSection.classList.remove("hidden");
+      bookingsBody.innerHTML = '<tr><td colspan="9">سجل الدخول لعرض الحجوزات.</td></tr>';
+    }
+
+    function formatDate(value) {
+      if (!value) return "-";
+      if (value.toDate) {
+        return value.toDate().toLocaleString("ar-EG");
+      }
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) return "-";
+      return parsed.toLocaleString("ar-EG");
+    }
+
+    function drawRows(bookings) {
+      if (!bookings.length) {
+        bookingsBody.innerHTML = '<tr><td colspan="9">لا توجد حجوزات حتى الآن.</td></tr>';
+        return;
+      }
+
+      bookingsBody.innerHTML = bookings.map((booking) => `
+        <tr>
+          <td>${formatDate(booking.createdAt)}</td>
+          <td>${booking.movie || "-"}</td>
+          <td>${booking.showtime || "-"}</td>
+          <td>${booking.customerName || "-"}</td>
+          <td>${booking.customerPhone || "-"}</td>
+          <td>${Array.isArray(booking.seats) ? booking.seats.join(", ") : "-"}</td>
+          <td>${booking.ticketCount || 0}</td>
+          <td>${booking.totalPrice || 0} EGP</td>
+          <td><button class="btn-delete" data-id="${booking.id}">حذف</button></td>
+        </tr>
+      `).join("");
+    }
+
+    function formatToday() {
+      return new Date().toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
+    }
+
+    async function addBooking(event) {
+      event.preventDefault();
+      if (!db) return;
+
+      const seats = seatsInput.value
+        .split(",")
+        .map((seat) => seat.trim())
+        .filter(Boolean);
+
+      if (!seats.length) {
+        statusMsg.textContent = "من فضلك اكتب مقعد واحد على الأقل.";
+        return;
+      }
+
+      const movie = movieInput.value.trim();
+      const showtime = showtimeInput.value.trim();
+      const customerName = nameInput.value.trim();
+      const customerPhone = phoneInput.value.trim();
+      const totalPrice = seats.length * 160;
+      const day = formatToday();
+
+      try {
+        await db.collection("bookings").add({
+          movie,
+          showtime,
+          day,
+          customerName,
+          customerPhone,
+          seats,
+          ticketCount: seats.length,
+          totalPrice,
+          bookingKey: `${movie}__${showtime}__${day}`,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        addBookingForm.reset();
+        statusMsg.textContent = "تمت إضافة الحجز بنجاح.";
+      } catch (error) {
+        console.error("Add booking error:", error);
+        statusMsg.textContent = "حصل خطأ أثناء إضافة الحجز.";
+      }
+    }
+
+    async function deleteBooking(bookingId) {
+      if (!db || !bookingId) return;
+      const ok = window.confirm("متأكد إنك عايز تحذف الحجز ده؟");
+      if (!ok) return;
+
+      try {
+        await db.collection("bookings").doc(bookingId).delete();
+        statusMsg.textContent = "تم حذف الحجز بنجاح.";
+      } catch (error) {
+        console.error("Delete booking error:", error);
+        statusMsg.textContent = "حصل خطأ أثناء حذف الحجز.";
+      }
+    }
+
+    function startBookingsListener() {
+      if (!isFirebaseConfigured || !db) {
+        statusMsg.textContent = "Firebase غير مفعّل. راجع إعدادات firebase.js";
+        bookingsBody.innerHTML = '<tr><td colspan="9">لا يمكن تحميل الحجوزات.</td></tr>';
+        return;
+      }
+
+      if (unsubscribeBookings) unsubscribeBookings();
+
+      unsubscribeBookings = db.collection("bookings")
+        .orderBy("createdAt", "desc")
+        .onSnapshot((snapshot) => {
+          const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          drawRows(data);
+          statusMsg.textContent = `إجمالي الحجوزات: ${data.length}`;
+        }, (error) => {
+          console.error("Bookings listener error:", error);
+          statusMsg.textContent = "حصل خطأ أثناء قراءة الحجوزات من Firebase.";
+          bookingsBody.innerHTML = '<tr><td colspan="9">تعذر تحميل الحجوزات.</td></tr>';
+        });
+    }
+
+    authForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!isFirebaseConfigured) {
+        authMsg.textContent = "Firebase غير مفعّل.";
+        return;
+      }
+
+      try {
+        await auth.signInWithEmailAndPassword(adminEmail.value.trim(), adminPassword.value);
+        authForm.reset();
+        authMsg.textContent = "";
+      } catch (error) {
+        console.error("Admin login error:", error);
+        authMsg.textContent = "فشل تسجيل الدخول. تأكد من الإيميل والباسورد.";
+      }
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      try {
+        await auth.signOut();
+      } catch (error) {
+        console.error("Logout error:", error);
+      }
+    });
+
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
+        if (unsubscribeBookings) {
+          unsubscribeBookings();
+          unsubscribeBookings = null;
+        }
+        showAuthUI();
+        return;
+      }
+
+      showAdminUI();
+      startBookingsListener();
+    });
+
+    addBookingForm.addEventListener("submit", addBooking);
+    bookingsBody.addEventListener("click", (event) => {
+      const button = event.target.closest(".btn-delete");
+      if (!button) return;
+      deleteBooking(button.dataset.id);
+    });
+  </script>
+</body>
+</html>

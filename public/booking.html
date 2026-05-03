@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>حجز المقاعد</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav>
+  <h1 class="logo">Karawan Cinema 🎬</h1>
+</nav>
+<button class="back-nav-btn" type="button" onclick="if (history.length > 1) { history.back(); } else { window.location.href='index.html'; }">⟵ Back</button>
+
+<section class="booking">
+  <h2>حجز التذاكر</h2>
+
+  <div class="prebooking-card">
+    <h3>1) اختار الفيلم والحفلة وأكّد بياناتك</h3>
+    <div class="prebooking-grid">
+      <label>
+        الفيلم
+        <select id="movieSelect">
+          <option value="">-- اختار الفيلم --</option>
+        </select>
+      </label>
+
+      <label>
+        الحفلة
+        <select id="showtimeSelect">
+          <option value="">-- اختار الحفلة --</option>
+        </select>
+      </label>
+
+      <label>
+        الاسم
+        <input type="text" id="customerName" placeholder="اكتب اسمك">
+      </label>
+
+      <label>
+        رقم الموبايل
+        <input type="tel" id="customerPhone" placeholder="01XXXXXXXXX">
+      </label>
+    </div>
+
+    <div class="prebooking-actions">
+      <button id="confirmInfoBtn" type="button">تأكيد البيانات والانتقال للمقاعد</button>
+      <p id="prebookingMsg"></p>
+    </div>
+  </div>
+
+  <div class="booking-layout" id="bookingLayout">
+    <div class="seat-map-card">
+      <div class="seat-map" id="seatMap"></div>
+      <div class="screen-curve screen-front">CINEMA SCREEN</div>
+    </div>
+
+    <aside class="booking-panel">
+      <h3>بيانات الحجز</h3>
+      <div class="panel-row"><span>الفيلم</span><strong id="summaryMovie">--</strong></div>
+      <div class="panel-row"><span>الحفلة</span><strong id="summaryShowtime">--</strong></div>
+      <div class="panel-row"><span>اليوم</span><strong id="summaryDay">--</strong></div>
+      <div class="panel-row"><span>العميل</span><strong id="summaryName">--</strong></div>
+      <div class="panel-row"><span>الموبايل</span><strong id="summaryPhone">--</strong></div>
+      <div class="panel-row"><span>القاعة</span><strong>رقم 1</strong></div>
+      <div class="panel-row"><span>الحالة</span><strong id="bookingState">بانتظار تأكيد البيانات</strong></div>
+
+      <div class="legend">
+        <div><i class="dot available"></i> متاح</div>
+        <div><i class="dot reserved"></i> محجوز</div>
+        <div><i class="dot selected"></i> مختار</div>
+      </div>
+      <p id="seatRuleMsg" class="seat-rule-msg"></p>
+
+      <div class="price-box">
+        <p>سعر التذكرة: 150 + 10 رسوم أونلاين</p>
+        <strong id="totalPrice">0 EGP</strong>
+      </div>
+
+      <p class="instapay-hint">بعد «تأكيد الحجز» المقاعد تُقفل <strong>بالأحمر</strong> لمدة <strong>5 دقائق</strong>. سيتم تحويلك مباشرة لبوابة <strong>Paymob</strong> للدفع بالفيزا/ماستركارد. إذا لم يكتمل الدفع خلال <strong>5 دقائق</strong> تتحرر المقاعد تلقائيًا.</p>
+
+      <button type="button" id="finalConfirmBtn">تأكيد الحجز</button>
+    </aside>
+  </div>
+
+</section>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script>
+  const db = window.db;
+  const isFirebaseConfigured = window.isFirebaseConfigured;
+  const API_BASE_URL = (window.API_BASE_URL || "").trim().replace(/\/+$/, "");
+  function apiUrl(path) {
+    const normalized = String(path || "").startsWith("/") ? path : `/${path}`;
+    return `${API_BASE_URL}${normalized}`;
+  }
+  const bookingsRef = db ? db.collection("bookings") : null;
+  const moviesRef = db ? db.collection("movies") : null;
+
+  const ticketPrice = 150;
+  const onlineFee = 10;
+  const seatPrice = ticketPrice + onlineFee;
+  const PAY_HOLD_MINUTES = 5;
+  const PAY_HOLD_MS = PAY_HOLD_MINUTES * 60 * 1000;
+  const HOLD_RECHECK_MS = 5000;
+  const totalPrice = document.getElementById("totalPrice");
+  const seatMap = document.getElementById("seatMap");
+  const bookingLayout = document.getElementById("bookingLayout");
+  const confirmInfoBtn = document.getElementById("confirmInfoBtn");
+  const movieSelect = document.getElementById("movieSelect");
+  const showtimeSelect = document.getElementById("showtimeSelect");
+  const prebookingMsg = document.getElementById("prebookingMsg");
+  const bookingState = document.getElementById("bookingState");
+  const finalConfirmBtn = document.getElementById("finalConfirmBtn");
+  const seatRuleMsg = document.getElementById("seatRuleMsg");
+  const defaultShowtimes = ["01:00 PM", "04:00 PM", "07:00 PM", "10:00 PM"];
+  const moviesMap = new Map();
+  let activeBookingKey = null;
+  let qnbVisaPaymentLink = "";
+  let qnbVisaUrlTemplate = "";
+
+  bookingLayout.style.display = "none";
+
+  async function loadQnbPaymentSettings() {
+    qnbVisaPaymentLink = "";
+    qnbVisaUrlTemplate = "";
+    if (!db) return;
+    try {
+      const snap = await db.collection("siteContent").doc("payment").get();
+      if (snap.exists) {
+        const d = snap.data();
+        const qnbLink = d.qnbVisaPaymentLink || d.qnbPaymentLink || d.qnbCollectLink;
+        if (qnbLink && typeof qnbLink === "string") qnbVisaPaymentLink = qnbLink.trim();
+        const qnbUrl = d.qnbVisaUrl || d.qnbUrl || d.qnbPaymentUrl;
+        if (qnbUrl && typeof qnbUrl === "string") qnbVisaUrlTemplate = qnbUrl.trim();
+      }
+    } catch (e) {
+      console.warn("loadQnbPaymentSettings", e);
+    }
+  }
+
+  function pickDirectQnbUrl(bookingData, bookingId) {
+    const tries = [
+      (qnbVisaPaymentLink || "").trim(),
+      (qnbVisaUrlTemplate || "").trim()
+    ];
+    for (let i = 0; i < tries.length; i++) {
+      if (!tries[i]) continue;
+      const built = buildPaymentRedirectUrl(tries[i], bookingData, bookingId);
+      if (isHttpUrl(built)) return built;
+    }
+    return "";
+  }
+
+  function buildPaymentRedirectUrl(template, data, bookingId) {
+    if (!template) return "";
+    let url = template;
+    const map = {
+      "{amount}": String(data.totalPrice),
+      "{total}": String(data.totalPrice),
+      "{tickets}": String(data.ticketCount),
+      "{phone}": encodeURIComponent(data.customerPhone || ""),
+      "{name}": encodeURIComponent(data.customerName || ""),
+      "{movie}": encodeURIComponent(data.movie || ""),
+      "{showtime}": encodeURIComponent(data.showtime || ""),
+      "{ref}": encodeURIComponent(bookingId),
+      "{bookingId}": encodeURIComponent(bookingId)
+    };
+    Object.keys(map).forEach((k) => {
+      url = url.split(k).join(map[k]);
+    });
+    return url.trim();
+  }
+
+  function isHttpUrl(str) {
+    if (!str || typeof str !== "string") return false;
+    try {
+      const u = new URL(str);
+      return u.protocol === "http:" || u.protocol === "https:";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function buildInternalQnbPaymentUrl(amount, bookingRef, bookingNotSaved) {
+    try {
+      const u = new URL("qnb-visa-pay.html", window.location.href);
+      u.searchParams.set("amount", String(amount));
+      if (bookingRef) u.searchParams.set("ref", String(bookingRef));
+      if (bookingNotSaved) u.searchParams.set("saved", "0");
+      return u.href;
+    } catch (e) {
+      const q = new URLSearchParams({
+        amount: String(amount)
+      });
+      if (bookingRef) q.set("ref", bookingRef);
+      if (bookingNotSaved) q.set("saved", "0");
+      return `qnb-visa-pay.html?${q.toString()}`;
+    }
+  }
+
+  function goToPayment(targetUrl) {
+    bookingState.textContent = "جاري تحويلك لصفحة الدفع (QNB)…";
+    window.location.replace(targetUrl);
+  }
+
+  function firebaseErrorHint(error) {
+    const code = error && error.code;
+    if (code === "permission-denied") {
+      return " صلّح Firebase: في Firestore Rules اسمح بالكتابة على collection اسمها bookings (مثلاً allow create: if true للتجربة).";
+    }
+    if (code === "unavailable") {
+      return " تحقق من الإنترنت وأعد المحاولة.";
+    }
+    return "";
+  }
+
+  function buildSeat(code, status = "available") {
+    return `<div class="seat ${status}" data-seat="${code}">${code}</div>`;
+  }
+
+  function buildRange(row, start, end, step = 2, status = "available") {
+    let html = "";
+    for (let n = start; n <= end; n += step) {
+      html += buildSeat(`${row}${n}`, status);
+    }
+    return html;
+  }
+
+  function buildRangeReverse(row, start, end, step = 2, status = "available") {
+    let html = "";
+    for (let n = end; n >= start; n -= step) {
+      html += buildSeat(`${row}${n}`, status);
+    }
+    return html;
+  }
+
+  function buildMap() {
+    const sideEvenRanges = {
+      E: [10, 20], F: [10, 20], G: [10, 18], H: [10, 18], I: [10, 20],
+      J: [10, 20], K: [10, 20], L: [10, 18], M: [10, 20], N: [10, 20], O: [10, 20], P: null
+    };
+
+    const sideOddRanges = {
+      E: [11, 21], F: [11, 21], G: [11, 21], H: [11, 19], I: [11, 21],
+      J: [11, 21], K: [11, 21], L: [11, 19], M: [11, 21], N: [11, 21], O: [11, 21], P: [11, 21]
+    };
+
+    const frontRows = ["E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"];
+    const middleOrder = [9, 7, 5, 3, 1, 2, 4, 6, 8];
+
+    const topLeft = `
+      <div class="zone zone-top-left">
+        <div class="row-grid cols-8">
+          ${buildRangeReverse("C", 5, 19)}
+          ${buildRangeReverse("D", 5, 19)}
+        </div>
+      </div>
+    `;
+
+    const topRight = `
+      <div class="zone zone-top-right">
+        <div class="row-grid cols-8">
+          ${buildRange("B", 6, 20)}
+          ${buildRange("C", 6, 20)}
+          ${buildRange("D", 6, 20)}
+        </div>
+      </div>
+    `;
+
+    let bottomRight = "";
+    let bottomCenter = "";
+    let bottomLeft = "";
+
+    frontRows.forEach((row) => {
+      const evenRange = sideEvenRanges[row];
+      const [oddStart, oddEnd] = sideOddRanges[row];
+      const oddCount = ((oddEnd - oddStart) / 2) + 1;
+      const evenCount = evenRange ? ((evenRange[1] - evenRange[0]) / 2) + 1 : 0;
+
+      bottomRight += `<div class="seat-line cols-6">${'<span class="seat-gap"></span>'.repeat(6 - oddCount)}${buildRangeReverse(row, oddStart, oddEnd, 2, "available")}</div>`;
+      bottomCenter += `<div class="seat-line cols-9">${middleOrder.map((n) => buildSeat(`${row}${n}`, "available")).join("")}</div>`;
+      bottomLeft += `<div class="seat-line cols-6">${evenRange ? buildRange(row, evenRange[0], evenRange[1], 2, "available") : ""}${'<span class="seat-gap"></span>'.repeat(6 - evenCount)}</div>`;
+    });
+
+    seatMap.innerHTML = `
+      <div class="map-row map-top">
+        ${topLeft}
+        ${topRight}
+      </div>
+
+      <div class="map-row map-bottom">
+        <div class="zone zone-bottom-right"><div class="row-stack">${bottomRight}</div></div>
+        <div class="zone zone-bottom-center"><div class="row-stack">${bottomCenter}</div></div>
+        <div class="zone zone-bottom-left"><div class="row-stack">${bottomLeft}</div></div>
+      </div>
+    `;
+  }
+
+  function updateTotal() {
+    const selected = document.querySelectorAll(".seat.selected").length;
+    totalPrice.textContent = `${selected * seatPrice} EGP`;
+  }
+
+  function clearSeatRuleMsg() {
+    seatRuleMsg.textContent = "";
+  }
+
+  function setSeatRuleMsg(message) {
+    seatRuleMsg.textContent = message;
+  }
+
+  function isValidContiguousSelection(selectedIndices, seatsInLine) {
+    if (!selectedIndices.length) return true;
+    const sorted = [...selectedIndices].sort((a, b) => a - b);
+
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] !== sorted[i - 1] + 1) return false;
+    }
+
+    const blockStart = sorted[0];
+    const blockEnd = sorted[sorted.length - 1];
+    const touchesLeftEdge = blockStart === 0;
+    const touchesRightEdge = blockEnd === seatsInLine.length - 1;
+    const leftNeighbor = seatsInLine[blockStart - 1];
+    const rightNeighbor = seatsInLine[blockEnd + 1];
+    const touchesReservedLeft = leftNeighbor?.classList.contains("reserved");
+    const touchesReservedRight = rightNeighbor?.classList.contains("reserved");
+
+    // الاختيار يكون من طرف الصف أو ملاصقًا لحجز موجود.
+    return touchesLeftEdge || touchesRightEdge || touchesReservedLeft || touchesReservedRight;
+  }
+
+  function createsSingleSeatGap(nextSelected, seatsInLine) {
+    const selectedSet = new Set(nextSelected);
+
+    const unavailable = seatsInLine.map((seat, index) => {
+      if (seat.classList.contains("reserved")) return true;
+      return selectedSet.has(index);
+    });
+
+    for (let i = 1; i < unavailable.length - 1; i++) {
+      const isSingleGap = !unavailable[i] && unavailable[i - 1] && unavailable[i + 1];
+      if (isSingleGap) return true;
+    }
+
+    return false;
+  }
+
+  function formatToday() {
+    const date = new Date();
+    return date.toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
+  }
+
+  function getBookingKey(movieTitle, showtime, day) {
+    return `${movieTitle}__${showtime}__${day}`;
+  }
+
+  function clearSeatStates() {
+    document.querySelectorAll(".seat-map .seat").forEach((seat) => {
+      seat.classList.remove("selected", "reserved");
+      seat.classList.add("available");
+    });
+    clearSeatRuleMsg();
+    updateTotal();
+  }
+
+  function expiryMs(holdExpiresAt) {
+    if (!holdExpiresAt) return null;
+    if (typeof holdExpiresAt.toMillis === "function") return holdExpiresAt.toMillis();
+    if (holdExpiresAt.seconds !== undefined)
+      return holdExpiresAt.seconds * 1000 + Math.floor((holdExpiresAt.nanoseconds || 0) / 1e6);
+    return null;
+  }
+
+  /** مقعد مقفول لو: تم الدفع؛ أو لسه ضمن مهلة الـ5 دق قبل الدفع. بدون holdExpiresAt = لا نحجز المقعد (يتحرر). */
+  function seatHoldActive(booking, nowMs) {
+    if (!booking || booking.cancelled === true || booking.paymentReleased === true) return false;
+    if (!Array.isArray(booking.seats) || booking.seats.length === 0) return false;
+
+    if (booking.paymentStatus === "paid" || booking.paymentConfirmed === true || booking.seatsPaid === true) return true;
+
+    const expMs = expiryMs(booking.holdExpiresAt);
+    if (expMs === null) return false;
+
+    return nowMs < expMs;
+  }
+
+  function applyReservedSeats(seatCodes) {
+    const reservedSet = new Set(seatCodes);
+    document.querySelectorAll(".seat-map .seat").forEach((seat) => {
+      const seatCode = seat.dataset.seat;
+      if (reservedSet.has(seatCode)) {
+        seat.classList.remove("selected", "available");
+        seat.classList.add("reserved");
+      } else if (!seat.classList.contains("selected")) {
+        seat.classList.remove("reserved");
+        seat.classList.add("available");
+      }
+    });
+    updateTotal();
+  }
+
+  let reservedSeatsUnsubscribe = null;
+  let cachedHoldBookings = [];
+  let holdRecheckInterval = null;
+
+  function stopReservedSeatListener() {
+    if (typeof reservedSeatsUnsubscribe === "function") {
+      reservedSeatsUnsubscribe();
+      reservedSeatsUnsubscribe = null;
+    }
+    if (holdRecheckInterval !== null) {
+      clearInterval(holdRecheckInterval);
+      holdRecheckInterval = null;
+    }
+    cachedHoldBookings = [];
+  }
+
+  function recomputeSeatHoldsFromCache() {
+    const nowMs = Date.now();
+    const reservedSeats = [];
+    cachedHoldBookings.forEach((booking) => {
+      if (!seatHoldActive(booking, nowMs)) return;
+      reservedSeats.push(...booking.seats);
+    });
+    applyReservedSeats(reservedSeats);
+  }
+
+  /**
+   * لمزامنة فورية: أي حجز يُكتب على Firebase له نفس الفيلم/الحفلة/اليوم
+   * يحدّث المقاعد الحمراء لكل المتصفّحين فورًا.
+   * يعتمد على حقل bookingKey المخزّن مع كل حجز.
+   */
+  function subscribeReservedSeats(movieTitle, showtime, day) {
+    stopReservedSeatListener();
+    if (!bookingsRef) return;
+
+    const key = getBookingKey(movieTitle, showtime, day);
+
+    reservedSeatsUnsubscribe = bookingsRef
+      .where("bookingKey", "==", key)
+      .onSnapshot(
+        (snapshot) => {
+          cachedHoldBookings = [];
+          snapshot.forEach((doc) => {
+            cachedHoldBookings.push(doc.data());
+          });
+          recomputeSeatHoldsFromCache();
+          if (bookingLayout.style.display === "grid") {
+            bookingState.textContent =
+              "اختيار المقاعد — الأحمر = محجوز مؤقتًا (دفع خلال " + PAY_HOLD_MINUTES + " دق) أو مؤكد بعد الدفع";
+          }
+          if (holdRecheckInterval !== null) clearInterval(holdRecheckInterval);
+          holdRecheckInterval = window.setInterval(recomputeSeatHoldsFromCache, HOLD_RECHECK_MS);
+        },
+        (error) => {
+          console.error("Reserved seats listener error:", error);
+          bookingState.textContent = "تعذر تحميل المقاعد المحجوزة. تحقق من صلاحيات قراءة bookings في Firebase.";
+        }
+      );
+  }
+
+  window.addEventListener("pagehide", stopReservedSeatListener);
+
+  function setShowtimeOptions(showtimes = defaultShowtimes) {
+    showtimeSelect.innerHTML = '<option value="">-- اختار الحفلة --</option>';
+    showtimes.forEach((time) => {
+      const option = document.createElement("option");
+      option.value = time;
+      option.textContent = time;
+      showtimeSelect.appendChild(option);
+    });
+  }
+
+  function setMovieOptions(movies) {
+    movieSelect.innerHTML = '<option value="">-- اختار الفيلم --</option>';
+    movies.forEach((movie) => {
+      const option = document.createElement("option");
+      option.value = movie.id;
+      option.textContent = movie.title;
+      movieSelect.appendChild(option);
+    });
+  }
+
+  function getMovieTitle(movieId) {
+    return moviesMap.get(movieId)?.title || movieId;
+  }
+
+  function getSelectedMovieShowtimes(movieId) {
+    const movie = moviesMap.get(movieId);
+    if (!movie || !Array.isArray(movie.showtimes) || !movie.showtimes.length) {
+      return defaultShowtimes;
+    }
+    return movie.showtimes;
+  }
+
+  async function loadMoviesFromFirebase() {
+    if (!isFirebaseConfigured || !moviesRef) {
+      setShowtimeOptions(defaultShowtimes);
+      prebookingMsg.textContent = "Firebase غير متاح، سيتم استخدام بيانات ثابتة.";
+      prebookingMsg.style.color = "#fbbf24";
+      return;
+    }
+
+    try {
+      const snapshot = await moviesRef.get();
+      const movies = [];
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const title = data.title || data.name;
+        if (!title) return;
+        const status = (data.status || "now").toLowerCase().trim();
+        const isComingSoon = ["coming", "coming soon", "soon"].includes(status);
+        if (isComingSoon) return;
+
+        const movie = {
+          id: doc.id,
+          title,
+          showtimes: Array.isArray(data.showtimes) ? data.showtimes : defaultShowtimes
+        };
+        movies.push(movie);
+        moviesMap.set(doc.id, movie);
+      });
+
+      if (!movies.length) {
+        prebookingMsg.textContent = "مفيش أفلام في Firebase. أضف بيانات في collection اسمها movies.";
+        prebookingMsg.style.color = "#fbbf24";
+        setShowtimeOptions(defaultShowtimes);
+        return;
+      }
+
+      setMovieOptions(movies);
+      setShowtimeOptions(defaultShowtimes);
+    } catch (error) {
+      console.error("Movies load error:", error);
+      prebookingMsg.textContent = "حصل خطأ أثناء تحميل الأفلام من Firebase.";
+      prebookingMsg.style.color = "#f87171";
+      setShowtimeOptions(defaultShowtimes);
+    }
+  }
+
+  confirmInfoBtn.addEventListener("click", () => {
+    const movieId = movieSelect.value.trim();
+    const movie = getMovieTitle(movieId);
+    const showtime = showtimeSelect.value.trim();
+    const name = document.getElementById("customerName").value.trim();
+    const phone = document.getElementById("customerPhone").value.trim();
+    const phoneRegex = /^01\d{9}$/;
+
+    if (!movie || !showtime || !name || !phone) {
+      prebookingMsg.textContent = "من فضلك كمّل كل البيانات قبل اختيار المقاعد.";
+      prebookingMsg.style.color = "#f87171";
+      return;
+    }
+
+    if (!phoneRegex.test(phone)) {
+      prebookingMsg.textContent = "رقم الموبايل لازم يكون 11 رقم ويبدأ بـ 01.";
+      prebookingMsg.style.color = "#f87171";
+      return;
+    }
+
+    document.getElementById("summaryMovie").textContent = movie;
+    document.getElementById("summaryShowtime").textContent = showtime;
+    document.getElementById("summaryDay").textContent = formatToday();
+    document.getElementById("summaryName").textContent = name;
+    document.getElementById("summaryPhone").textContent = phone;
+    activeBookingKey = getBookingKey(movie, showtime, document.getElementById("summaryDay").textContent);
+
+    bookingLayout.style.display = "grid";
+    bookingState.textContent = "اختيار المقاعد";
+    prebookingMsg.textContent = "تم تأكيد البيانات بنجاح.";
+    prebookingMsg.style.color = "#4bd367";
+    clearSeatStates();
+    subscribeReservedSeats(movie, showtime, document.getElementById("summaryDay").textContent);
+    bookingLayout.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  buildMap();
+  setShowtimeOptions(defaultShowtimes);
+  loadMoviesFromFirebase();
+  loadQnbPaymentSettings();
+
+  movieSelect.addEventListener("change", () => {
+    const movieId = movieSelect.value.trim();
+    setShowtimeOptions(getSelectedMovieShowtimes(movieId));
+  });
+
+  updateTotal();
+
+  document.querySelectorAll(".seat-map .seat").forEach((seat) => {
+    seat.addEventListener("click", () => {
+      if (seat.classList.contains("reserved")) return;
+      const line = seat.closest(".seat-line");
+      if (!line) return;
+
+      const seatsInLine = Array.from(line.querySelectorAll(".seat"));
+      const index = seatsInLine.indexOf(seat);
+      const isSelecting = !seat.classList.contains("selected");
+
+      const selectedIndices = seatsInLine
+        .map((s, i) => (s.classList.contains("selected") ? i : -1))
+        .filter((i) => i !== -1);
+
+      const nextSelected = isSelecting
+        ? [...selectedIndices, index]
+        : selectedIndices.filter((i) => i !== index);
+
+      if (!isValidContiguousSelection(nextSelected, seatsInLine)) {
+        setSeatRuleMsg("اختار مقاعد متجاورة فقط، ولا تترك كرسيًا فاضيًا بين المقاعد.");
+        return;
+      }
+
+      if (createsSingleSeatGap(nextSelected, seatsInLine)) {
+        setSeatRuleMsg("غير مسموح تسيب كرسي واحد فاضي بين حجوزات. اختار المقاعد بشكل متصل.");
+        return;
+      }
+
+      if (isSelecting) {
+        seat.classList.remove("available");
+        seat.classList.add("selected");
+      } else {
+        seat.classList.remove("selected");
+        seat.classList.add("available");
+      }
+
+      clearSeatRuleMsg();
+      updateTotal();
+    });
+  });
+
+  finalConfirmBtn.addEventListener("click", async () => {
+    const selectedSeats = Array.from(document.querySelectorAll(".seat.selected"));
+    if (!selectedSeats.length) {
+      bookingState.textContent = "اختار مقعد واحد على الأقل";
+      return;
+    }
+
+    finalConfirmBtn.disabled = true;
+
+    let bookingDataForPay = null;
+
+    try {
+      const totalAmount = selectedSeats.length * seatPrice;
+
+      const bookingPayload = {
+        movie: document.getElementById("summaryMovie").textContent,
+        showtime: document.getElementById("summaryShowtime").textContent,
+        day: document.getElementById("summaryDay").textContent,
+        bookingKey: activeBookingKey,
+        customerName: document.getElementById("summaryName").textContent,
+        customerPhone: document.getElementById("summaryPhone").textContent,
+        seats: selectedSeats.map((seat) => seat.dataset.seat),
+        ticketCount: selectedSeats.length,
+        totalPrice: totalAmount,
+        paymentMethod: "paymob",
+        paymentStatus: "pending_payment",
+        holdExpiresAt: firebase.firestore.Timestamp.fromMillis(Date.now() + PAY_HOLD_MS),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      bookingDataForPay = { ...bookingPayload };
+      delete bookingDataForPay.createdAt;
+      delete bookingDataForPay.holdExpiresAt;
+
+      await loadQnbPaymentSettings();
+
+      async function finalizePaymentRedirect(docId) {
+        if (!docId) {
+          bookingState.textContent = "لا يمكن بدء الدفع بدون حفظ الحجز أولًا.";
+          return;
+        }
+
+        if (docId) {
+          try {
+            const cfgRes = await fetch(apiUrl("/api/payment/config"));
+            const cfg = cfgRes.ok ? await cfgRes.json() : {};
+            if (cfg && cfg.paymob) {
+              const r = await fetch(apiUrl("/api/paymob/session"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ bookingId: docId })
+              });
+              const j = await r.json().catch(function () {
+                return {};
+              });
+              if (r.ok && j && j.url) {
+                bookingState.textContent = "جاري تحويلك لبوابة الدفع الإلكتروني (Paymob)…";
+                window.location.assign(j.url);
+                return;
+              }
+              console.warn("Paymob session failed:", j.error || r.statusText || r.status);
+              bookingState.textContent =
+                "تعذر فتح Paymob: " + (j.error || r.statusText || "تحقق من إعدادات السيرفر");
+              return;
+            } else {
+              bookingState.textContent =
+                "Paymob غير مفعّل على السيرفر. راجع مفاتيح .env و Firebase Admin ثم أعد المحاولة.";
+              return;
+            }
+          } catch (e) {
+            console.warn("Payment gateway unavailable.", e);
+            bookingState.textContent = "تعذر الاتصال ببوابة Paymob. تأكد أن السيرفر يعمل.";
+            return;
+          }
+        }
+      }
+
+      if (!bookingsRef) {
+        bookingState.innerHTML =
+          "Firebase غير متصل — الحجز لم يُحفظ. راجع <code>firebase.js</code> وافتح الموقع من سيرفر وليس كملف محلي.";
+        clearSeatRuleMsg();
+        updateTotal();
+        await finalizePaymentRedirect("");
+        return;
+      }
+
+      const docRef = await bookingsRef.add(bookingPayload);
+      selectedSeats.forEach((seat) => {
+        seat.classList.remove("selected", "available");
+        seat.classList.add("reserved");
+      });
+      clearSeatRuleMsg();
+      updateTotal();
+
+      await finalizePaymentRedirect(docRef.id);
+    } catch (error) {
+      console.error("Firebase save error:", error);
+      clearSeatRuleMsg();
+      updateTotal();
+      const totalAmount = selectedSeats.length * seatPrice;
+      await loadQnbPaymentSettings();
+      const data = bookingDataForPay || {
+        totalPrice: totalAmount,
+        ticketCount: selectedSeats.length,
+        customerName: document.getElementById("summaryName").textContent,
+        customerPhone: document.getElementById("summaryPhone").textContent,
+        movie: document.getElementById("summaryMovie").textContent,
+        showtime: document.getElementById("summaryShowtime").textContent
+      };
+      const hint = firebaseErrorHint(error);
+      bookingState.innerHTML =
+        "لم يُحفظ الحجز على السيرفر. لذلك لم يتم تحويلك إلى Paymob." +
+        (hint ? "<br><span class=\"booking-error-hint\">" + hint + "</span>" : "") +
+        "<br>تأكد من Firestore Rules واتصال Firebase ثم أعد المحاولة.";
+    } finally {
+      finalConfirmBtn.disabled = false;
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Karawan Cinema</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>  
+
+<!-- ===== NAVBAR ===== -->
+<nav>
+  <h1 class="logo">Karawan Cinema 🎬</h1>
+
+  <ul>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="movies.html">About Our Cinema</a></li>
+    <li><a href="booking.html">Booking</a></li>
+    <li><a href="locations.html">Locations</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+</nav>
+
+<!-- ===== HERO ===== -->
+<section class="hero hero-home">
+  <div class="hero-content">
+    <p class="hero-kicker">Premium Experience</p>
+    <h2>Experience Cinema Like Never Before</h2>
+    <p>Luxury seats, immersive sound, and the latest blockbusters - all in one place.</p>
+    <div class="hero-actions">
+      <a href="movies.html"><button>About Our Cinema</button></a>
+      <a href="booking.html" class="btn-secondary">Book Your Seat</a>
+    </div>
+    <div class="hero-stats">
+      <div><strong>6</strong><span>Screens</span></div>
+      <div><strong>4K</strong><span>Projection</span></div>
+      <div><strong>Dolby</strong><span>Atmos Sound</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== NOW SHOWING ===== -->
+<section class="movies home-section">
+  <div class="section-head">
+    <h2>Now Showing</h2>
+    <a href="booking.html" class="section-link">Book now</a>
+  </div>
+
+  <div class="row" id="nowShowingRow"></div>
+</section>
+
+<!-- ===== COMING SOON ===== -->
+<section class="movies home-section">
+  <div class="section-head">
+    <h2>Coming Soon</h2>
+  </div>
+
+  <div class="row" id="comingSoonRow"></div>
+</section>
+
+<footer class="site-footer">
+  <p>Karawan Cinema - Your next movie night starts here.</p>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script>
+  const db = window.db;
+  const isFirebaseConfigured = window.isFirebaseConfigured;
+  const nowShowingRow = document.getElementById("nowShowingRow");
+  const comingSoonRow = document.getElementById("comingSoonRow");
+
+  function createMovieCard(movie, withBookingButton = true) {
+    const card = document.createElement("div");
+    card.className = "movie-card";
+    const title = movie.title || movie.name || "Untitled Movie";
+    const category = movie.category || movie.genre || "Cinema";
+    const image = movie.imageUrl || movie.posterUrl || movie.image || "images/movie1.jpg";
+    const statusButton = withBookingButton ? '<a href="booking.html"><button>Book Now</button></a>' : "";
+
+    card.innerHTML = `
+      <div class="movie-card-poster">
+        <img src="${image}" alt="${title} poster" loading="lazy" decoding="async">
+        <span class="movie-tag">${category}</span>
+      </div>
+      <h3>${title}</h3>
+      ${statusButton}
+    `;
+    return card;
+  }
+
+  function showFallbackCards() {
+    nowShowingRow.innerHTML = "";
+    comingSoonRow.innerHTML = "";
+
+    nowShowingRow.appendChild(createMovieCard({
+      title: "The Mummy",
+      category: "Action",
+      image: "images/movie1.jpg"
+    }));
+    nowShowingRow.appendChild(createMovieCard({
+      title: "Devil Wears Prada",
+      category: "Drama",
+      image: "images/movie2.jpg"
+    }));
+
+    comingSoonRow.appendChild(createMovieCard({
+      title: "Horror Night",
+      category: "Horror",
+      image: "images/movie4.jpg"
+    }, false));
+  }
+
+  async function loadMovies() {
+    if (!isFirebaseConfigured || !db) {
+      showFallbackCards();
+      return;
+    }
+
+    try {
+      const snapshot = await db.collection("movies").get();
+      const nowShowing = [];
+      const comingSoon = [];
+
+      snapshot.forEach((doc) => {
+        const movie = doc.data();
+        const status = (movie.status || "now").toLowerCase().trim();
+        const isComingSoon = ["coming", "coming soon", "soon"].includes(status);
+        if (isComingSoon) {
+          comingSoon.push(movie);
+        } else {
+          nowShowing.push(movie);
+        }
+      });
+
+      nowShowingRow.innerHTML = "";
+      comingSoonRow.innerHTML = "";
+
+      nowShowing.slice(0, 6).forEach((movie) => nowShowingRow.appendChild(createMovieCard(movie, true)));
+      comingSoon.slice(0, 6).forEach((movie) => comingSoonRow.appendChild(createMovieCard(movie, false)));
+
+      if (!nowShowing.length && !comingSoon.length) {
+        showFallbackCards();
+      }
+    } catch (error) {
+      console.error("Error loading movies:", error);
+      showFallbackCards();
+    }
+  }
+
+  loadMovies();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About Our Cinema</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav>
+  <h1 class="logo">Karawan Cinema 🎬</h1>
+  <ul>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="movies.html">About Our Cinema</a></li>
+    <li><a href="booking.html">Booking</a></li>
+    <li><a href="locations.html">Locations</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+</nav>
+<button class="back-nav-btn" type="button" onclick="if (history.length > 1) { history.back(); } else { window.location.href='index.html'; }">⟵ Back</button>
+
+<section class="about-cinema">
+  <div class="about-hero">
+    <img id="aboutCinemaImage" src="https://i.postimg.cc/xCk7mRLY/292258671-5321470241262070-684653501812871311-n.jpg" alt="Karawan Cinema Hall">
+    <div class="about-overlay">
+      <p class="about-kicker">About Our Cinema</p>
+      <h2>Where Movies Become Memories</h2>
+      <p>
+        Karawan Cinema is crafted for people who love the true cinema vibe:
+        giant screens, premium sound, comfortable seating, and a carefully curated movie lineup.
+      </p>
+    </div>
+  </div>
+
+  <div class="about-grid">
+    <article class="about-card">
+      <h3>Our Experience</h3>
+      <p>
+        From the moment you walk in, you feel the atmosphere. Elegant design, welcoming staff,
+        and smooth digital booking make your visit effortless and enjoyable.
+      </p>
+    </article>
+
+    <article class="about-card">
+      <h3>Technology</h3>
+      <p>
+        We deliver 4K projection, high contrast visuals, and immersive Dolby sound
+        so every scene feels larger than life.
+      </p>
+    </article>
+
+    <article class="about-card">
+      <h3>Comfort First</h3>
+      <p>
+        Spacious halls, clear viewing angles, and thoughtfully planned seating
+        ensure every guest enjoys a premium movie night.
+      </p>
+    </article>
+  </div>
+</section>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script>
+  async function loadAboutCinemaImage() {
+    if (!window.db) return;
+
+    try {
+      const doc = await window.db.collection("siteContent").doc("about").get();
+      if (!doc.exists) return;
+
+      const data = doc.data();
+      const imageEl = document.getElementById("aboutCinemaImage");
+      if (!imageEl) return;
+
+      if (data.cinemaImageUrl && typeof data.cinemaImageUrl === "string") {
+        imageEl.src = data.cinemaImageUrl;
+      }
+    } catch (error) {
+      console.error("Failed to load about image:", error);
+    }
+  }
+
+  loadAboutCinemaImage();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QNB Visa — Karawan Cinema</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav>
+  <h1 class="logo">Karawan Cinema 🎬</h1>
+  <ul>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="booking.html">Booking</a></li>
+  </ul>
+</nav>
+
+<button class="back-nav-btn" type="button" onclick="window.location.href='index.html';">⟵ الرئيسية</button>
+
+<section class="instapay-pay-page">
+  <div class="instapay-pay-card">
+    <p class="instapay-pay-kicker">دفع</p>
+    <h2>QNB Visa Checkout</h2>
+    <p id="notSavedBanner" class="instapay-not-saved-banner" hidden>لم يُسجَّل الحجز إلكترونيًا.</p>
+    <p id="noLinkHint" class="instapay-no-link-hint" hidden>
+      للدفع بالبطاقة عبر الإنترنت لازم <strong>رابط HTTPS</strong> من بوابة QNB (مثلاً <code dir="ltr">qnbVisaPaymentLink</code>).
+      رقم الحساب وحده <strong>مش بديل للرابط</strong> — يُستخدم للتحويل البنكي اليدوي؛ ضعه في <code dir="ltr">qnbAccountNumber</code> أو <code dir="ltr">qnbIban</code> داخل <code dir="ltr">siteContent/payment</code>.
+    </p>
+
+    <div class="instapay-sum-box">
+      <span>المبلغ</span>
+      <strong id="amountDisplay">—</strong>
+    </div>
+
+    <div class="instapay-ref-row">
+      <span>مرجع الحجز</span>
+      <code id="refDisplay">—</code>
+    </div>
+
+    <div class="instapay-wallet-box" id="cardGatewayBox">
+      <span>الدفع بالبطاقة (بوابة إلكترونية)</span>
+      <p class="instapay-wallet-number">Visa / MasterCard — يفتح من رابط البنك فقط</p>
+      <div class="instapay-actions">
+        <a id="openQnbBtn" class="instapay-copy-btn" href="#" target="_blank" rel="noopener noreferrer" hidden>افتح بوابة QNB</a>
+      </div>
+    </div>
+
+    <div class="instapay-wallet-box" id="accountTransferBox" hidden>
+      <span>تحويل على حساب QNB</span>
+      <p class="instapay-wallet-number" id="accountDisplay">—</p>
+      <div class="instapay-actions">
+        <button type="button" class="instapay-copy-btn" id="copyAccountBtn">نسخ رقم الحساب / الآيبان</button>
+        <button type="button" class="instapay-copy-btn instapay-copy-secondary" id="copyAmountBtn">نسخ المبلغ</button>
+      </div>
+    </div>
+
+    <div class="instapay-pay-confirm-box" id="manualConfirmWrap" hidden>
+      <button type="button" class="instapay-paid-confirm-btn" id="manualConfirmBtn">أكتم الدفع بعد التحويل</button>
+      <p class="instapay-confirm-note">يظهر فقط لو مفيش رابط بوابة؛ التأكيد التلقائي من البنك يحتاج رابط الدفع + Webhook على السيرفر.</p>
+    </div>
+
+    <div class="instapay-pay-confirm-box" id="confirmPaidWrap">
+      <p class="instapay-confirm-note" id="autoStatusNote">جارِ انتظار تأكيد الدفع تلقائيًا من بوابة QNB…</p>
+    </div>
+
+    <a href="index.html" class="instapay-done-link">الرئيسية</a>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <p>Karawan Cinema</p>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script>
+  const DEFAULT_QNB_ACCOUNT_NUMBER = "20313544841";
+  const params = new URLSearchParams(window.location.search);
+  const amountRaw = params.get("amount");
+  const refRaw = params.get("ref");
+  const savedFlag = params.get("saved");
+  const API_BASE_URL = (window.API_BASE_URL || "").trim().replace(/\/+$/, "");
+  function apiUrl(path) {
+    const normalized = String(path || "").startsWith("/") ? path : `/${path}`;
+    return `${API_BASE_URL}${normalized}`;
+  }
+
+  const amountDisplay = document.getElementById("amountDisplay");
+  const refDisplay = document.getElementById("refDisplay");
+  const noLinkHint = document.getElementById("noLinkHint");
+  const openQnbBtn = document.getElementById("openQnbBtn");
+  const cardGatewayBox = document.getElementById("cardGatewayBox");
+  const accountTransferBox = document.getElementById("accountTransferBox");
+  const accountDisplay = document.getElementById("accountDisplay");
+  const manualConfirmWrap = document.getElementById("manualConfirmWrap");
+  const manualConfirmBtn = document.getElementById("manualConfirmBtn");
+  const copyAccountBtn = document.getElementById("copyAccountBtn");
+  const copyAmountBtn = document.getElementById("copyAmountBtn");
+  const autoStatusNote = document.getElementById("autoStatusNote");
+  let qnbGatewayUrl = "";
+  let qnbAccountRaw = "";
+  let amountPlain = "";
+  let statusPollTimer = null;
+
+  if (savedFlag === "0") {
+    document.getElementById("notSavedBanner").hidden = false;
+  }
+
+  if (amountRaw && /^[0-9]+(\.[0-9]{1,2})?$/.test(amountRaw.trim())) {
+    amountPlain = amountRaw.trim();
+    amountDisplay.textContent = amountPlain + " ج.م";
+  } else if (amountRaw) {
+    amountPlain = amountRaw.trim();
+    amountDisplay.textContent = amountPlain + " ج.م";
+  }
+
+  if (refRaw) {
+    refDisplay.textContent = refRaw.trim();
+  }
+
+  function isHttpUrl(str) {
+    if (!str || typeof str !== "string") return false;
+    try {
+      const u = new URL(str);
+      return u.protocol === "http:" || u.protocol === "https:";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function normalizeAccountDisplay(d) {
+    const iban = (d.qnbIban || d.qnbIBAN || d.iban || "").trim().replace(/\s+/g, "");
+    const acc = (d.qnbAccountNumber || d.qnbBankAccount || d.qnbAccount || DEFAULT_QNB_ACCOUNT_NUMBER || "")
+      .trim()
+      .replace(/\s+/g, "");
+    const accName = (d.qnbAccountName || d.accountHolderName || "").trim();
+    const parts = [];
+    if (iban) parts.push("IBAN: " + iban.replace(/(.{4})/g, "$1 ").trim());
+    if (acc) parts.push("حساب: " + acc);
+    if (accName) parts.push("باسم: " + accName);
+    qnbAccountRaw = iban || acc || "";
+    return { text: parts.join(" — ") || "", raw: qnbAccountRaw, accName };
+  }
+
+  async function loadQnbUrlFromFirestore() {
+    const db = window.db;
+    if (!db) return;
+    try {
+      const snap = await db.collection("siteContent").doc("payment").get();
+      if (!snap.exists) return;
+      const d = snap.data() || {};
+      const link = (d.qnbVisaPaymentLink || d.qnbPaymentLink || d.qnbCollectLink || "").trim();
+      const url = (d.qnbVisaUrl || d.qnbUrl || d.qnbPaymentUrl || "").trim();
+      qnbGatewayUrl = link || url || "";
+
+      const accInfo = normalizeAccountDisplay(d);
+      if (accInfo.text && accountDisplay) {
+        accountDisplay.textContent = accInfo.text;
+      }
+    } catch (e) {
+      console.warn("loadQnbUrlFromFirestore", e);
+    }
+  }
+
+  function toast(msg) {
+    const t = document.createElement("p");
+    t.className = "instapay-toast";
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add("visible"));
+    setTimeout(() => {
+      t.classList.remove("visible");
+      setTimeout(() => t.remove(), 300);
+    }, 2400);
+  }
+
+  async function fetchBookingPaymentStatus() {
+    const id = refRaw && refRaw.trim();
+    if (!id) return null;
+    try {
+      const r = await fetch(apiUrl(`/api/bookings/${encodeURIComponent(id)}/payment-status`), {
+        method: "GET",
+        headers: { "Accept": "application/json" }
+      });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function pollPaymentState() {
+    const status = await fetchBookingPaymentStatus();
+    if (!status || !autoStatusNote) return;
+
+    if (status.paid) {
+      autoStatusNote.textContent = "تم تأكيد الدفع. جاري تحويلك…";
+      if (statusPollTimer) clearInterval(statusPollTimer);
+      setTimeout(() => {
+        const doneUrl = new URL("payment-done.html", window.location.href);
+        if (refRaw) doneUrl.searchParams.set("ref", refRaw.trim());
+        window.location.replace(doneUrl.href);
+      }, 700);
+      return;
+    }
+
+    if (status.holdActive === false) {
+      autoStatusNote.textContent = "انتهت مهلة الدفع (5 دقائق) ولم يتم التأكيد. المقاعد رجعت متاحة.";
+      if (statusPollTimer) clearInterval(statusPollTimer);
+      return;
+    }
+
+    if (isHttpUrl(qnbGatewayUrl)) {
+      autoStatusNote.textContent = "جارِ انتظار تأكيد الدفع تلقائيًا من بوابة QNB…";
+    } else if (qnbAccountRaw) {
+      autoStatusNote.textContent = "بعد التحويل على رقم الحساب اضغط «أكتم الدفع بعد التحويل»، أو انتظر لو الأدمن يأكد الحجز.";
+    } else {
+      autoStatusNote.textContent = "اضبط رابط البوابة أو رقم الحساب في Firestore.";
+    }
+  }
+
+  async function copyText(text, okMsg) {
+    if (!text) {
+      toast("لا يوجد نص للنسخ.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(okMsg);
+    } catch (e) {
+      toast("انسخ يدويًا.");
+    }
+  }
+
+  if (copyAccountBtn) {
+    copyAccountBtn.addEventListener("click", () => {
+      copyText(qnbAccountRaw, "تم النسخ");
+    });
+  }
+  if (copyAmountBtn) {
+    copyAmountBtn.addEventListener("click", () => {
+      copyText(amountPlain, "تم نسخ المبلغ");
+    });
+  }
+
+  if (manualConfirmBtn) {
+    manualConfirmBtn.addEventListener("click", async () => {
+      const id = refRaw && refRaw.trim();
+      if (!id) {
+        toast("لا يوجد رقم مرجع حجز.");
+        return;
+      }
+      const dbPay = window.db;
+      if (!dbPay || typeof firebase === "undefined") {
+        toast("Firebase غير جاهز.");
+        return;
+      }
+      manualConfirmBtn.disabled = true;
+      try {
+        await dbPay
+          .collection("bookings")
+          .doc(id)
+          .update({
+            paymentStatus: "paid",
+            seatsPaid: true,
+            paymentConfirmedManual: true,
+            paidAt: firebase.firestore.FieldValue.serverTimestamp(),
+            holdExpiresAt: firebase.firestore.FieldValue.delete()
+          });
+        toast("تم تثبيت الحجز.");
+        await pollPaymentState();
+      } catch (err) {
+        console.error(err);
+        toast("تعذر الحفظ — راجع صلاحيات Firestore.");
+        manualConfirmBtn.disabled = false;
+      }
+    });
+  }
+
+  (async function initQnbPage() {
+    await loadQnbUrlFromFirestore();
+    const hasGateway = isHttpUrl(qnbGatewayUrl);
+    const hasAccount = !!qnbAccountRaw;
+
+    if (hasGateway) {
+      openQnbBtn.hidden = false;
+      openQnbBtn.href = qnbGatewayUrl;
+      noLinkHint.hidden = true;
+      if (manualConfirmWrap) manualConfirmWrap.hidden = true;
+    } else {
+      openQnbBtn.hidden = true;
+    }
+
+    if (hasAccount && accountTransferBox) {
+      accountTransferBox.hidden = false;
+      if (!hasGateway) noLinkHint.hidden = true;
+      if (manualConfirmWrap && !hasGateway && refRaw && savedFlag !== "0") manualConfirmWrap.hidden = false;
+    } else if (accountTransferBox) {
+      accountTransferBox.hidden = true;
+    }
+
+    if (!hasGateway && !hasAccount) {
+      noLinkHint.hidden = false;
+    }
+
+    if (!hasGateway && !hasAccount && cardGatewayBox) {
+      cardGatewayBox.querySelector(".instapay-wallet-number").textContent =
+        "لا يوجد رابط بوابة — أضف رابط HTTPS من QNB أو رقم حساب للتحويل.";
+    }
+
+    if (refRaw && savedFlag !== "0") {
+      await pollPaymentState();
+      statusPollTimer = window.setInterval(pollPaymentState, 5000);
+    } else if (autoStatusNote) {
+      autoStatusNote.textContent = "لا يوجد مرجع حجز صالح لمتابعة حالة الدفع.";
+    }
+  })();
+</script>
+
+</body>
+</html>

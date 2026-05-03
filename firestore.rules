@@ -1,0 +1,35 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // الأفلام: قراءة للجميع، التعديل للأدمن المسجّل فقط
+    match /movies/{movieId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // الحجوزات:
+    // - create: أي زائر (صفحة الحجز)
+    // - read: أي زائر (مزامنة المقاعد الحمراء على الخريطة)
+    // - update: مفتوح مؤقتًا لتأكيد الدفع اليدوي من صفحة QNB؛ Paymob webhook يمر عبر Admin ولا يخضع للقواعد
+    // - delete: الأدمن فقط
+    match /bookings/{bookingId} {
+      allow create: if true;
+      allow read: if true;
+      allow update: if true;
+      allow delete: if request.auth != null;
+    }
+
+    // إعدادات الدفع/المحتوى (روابط QNB إلخ) — قراءة عامة، لا كتابة من العميل
+    match /siteContent/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // أي collection أخرى: مرفوع افتراضيًا
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

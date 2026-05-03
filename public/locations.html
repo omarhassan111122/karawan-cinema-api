@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Locations - Karawan Cinema</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav>
+  <h1 class="logo">Karawan Cinema 🎬</h1>
+  <ul>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="movies.html">About Our Cinema</a></li>
+    <li><a href="booking.html">Booking</a></li>
+    <li><a href="locations.html">Locations</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+</nav>
+<button class="back-nav-btn" type="button" onclick="if (history.length > 1) { history.back(); } else { window.location.href='index.html'; }">⟵ Back</button>
+
+<section class="locations-page">
+  <div class="locations-head">
+    <h2>Our Location</h2>
+    <p>Visit Karawan Cinema and enjoy the best movie night experience in Port Said.</p>
+  </div>
+
+  <div class="locations-grid">
+    <article class="location-card">
+      <h3>Karawan Cinema - Main Branch</h3>
+      <p><strong>Address:</strong> <span id="locationAddress">Al Shahid Tayar Atef Al Sadat Street, Port Said, Egypt</span></p>
+      <p><strong>Phone:</strong> <span id="locationPhone">+20 66 333 2211</span></p>
+      <p><strong>Email:</strong> <span id="locationEmail">karawan@cinema.com</span></p>
+      <p><strong>Working Hours:</strong> <span id="locationHours">Daily from 10:00 AM to 12:00 AM</span></p>
+      <a id="locationMapLink" class="location-map-link" href="https://maps.apple.com/?address=Al%20Shahid%20Tayar%20Atef%20Al%20Sadat%20Street,%20Port%20Said,%20Egypt&auid=15966281657764225682&ll=31.270980,32.308484&lsp=9902&q=El%20Karawan%20Cinema&t=m" target="_blank" rel="noopener noreferrer">Open Location</a>
+    </article>
+
+    <div class="location-map-wrap">
+      <iframe
+        id="locationMapIframe"
+        class="location-map"
+        src="https://www.google.com/maps?q=31.270980,32.308484&output=embed"
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+        allowfullscreen>
+      </iframe>
+    </div>
+  </div>
+</section>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script>
+  async function loadLocationData() {
+    if (!window.db || typeof window.fetchMergedSiteLocationData !== "function") return;
+
+    try {
+      const pack = await window.fetchMergedSiteLocationData();
+      if (!pack || !pack.merged) return;
+
+      const data = pack.merged;
+      const loc = pack.locationDoc;
+      const addressEl = document.getElementById("locationAddress");
+      const phoneEl = document.getElementById("locationPhone");
+      const emailEl = document.getElementById("locationEmail");
+      const hoursEl = document.getElementById("locationHours");
+      const mapLinkEl = document.getElementById("locationMapLink");
+      const mapIframeEl = document.getElementById("locationMapIframe");
+
+      function pickField(primary, fallback) {
+        if (primary != null && String(primary).trim() !== "") return primary;
+        return fallback;
+      }
+
+      const address = pickField(loc && (loc.address || loc.locationAddress), data.address || data.locationAddress);
+      const phone = pickField(loc && (loc.phone || loc.locationPhone), data.phone || data.locationPhone);
+      const email = pickField(loc && (loc.email || loc.locationEmail), data.email || data.locationEmail);
+      const hours = pickField(
+        loc && (loc.hours ?? loc.workingHours ?? loc.openingHours),
+        data.hours || data.workingHours || data.openingHours
+      );
+      let mapUrl = pickField(loc && (loc.mapUrl || loc.locationMapUrl), data.mapUrl || data.locationMapUrl);
+      const coords = pack.coords;
+
+      if (!mapUrl && coords) {
+        mapUrl = `https://www.google.com/maps?q=${coords.lat},${coords.lng}`;
+      }
+
+      if (address && addressEl) addressEl.textContent = address;
+      if (phone && phoneEl) phoneEl.textContent = phone;
+      if (email && emailEl) emailEl.textContent = email;
+      if (hours && hoursEl) hoursEl.textContent = hours;
+      if (mapUrl && mapLinkEl) mapLinkEl.href = mapUrl;
+
+      if (data.mapEmbedUrl && mapIframeEl) {
+        mapIframeEl.src = data.mapEmbedUrl;
+      } else if (coords && mapIframeEl) {
+        mapIframeEl.src = `https://www.google.com/maps?q=${coords.lat},${coords.lng}&output=embed`;
+      }
+    } catch (error) {
+      console.error("Failed to load location data:", error);
+    }
+  }
+
+  loadLocationData();
+</script>
+
+</body>
+</html>

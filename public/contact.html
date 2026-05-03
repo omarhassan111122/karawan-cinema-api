@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Contact</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav>
+  <h1 class="logo">Karawan Cinema 🎬</h1>
+  <ul>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="movies.html">About Our Cinema</a></li>
+    <li><a href="booking.html">Booking</a></li>
+    <li><a href="locations.html">Locations</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+</nav>
+<button class="back-nav-btn" type="button" onclick="if (history.length > 1) { history.back(); } else { window.location.href='index.html'; }">⟵ Back</button>
+
+<section class="contact">
+
+  <h2>Contact Us</h2>
+
+  <p>📍 <span id="contactAddress">Al Shahid Tayar Atef Al Sadat Street, Port Said, Egypt</span></p>
+  <p>📞 <span id="contactPhone">+20 66 333 2211</span></p>
+  <p>📧 <span id="contactEmail">karawan@cinema.com</span></p>
+  <p>🗺️ <a id="contactMapLink" href="https://maps.apple.com/?address=Al%20Shahid%20Tayar%20Atef%20Al%20Sadat%20Street,%20Port%20Said,%20Egypt&auid=15966281657764225682&ll=31.270980,32.308484&lsp=9902&q=El%20Karawan%20Cinema&t=m" target="_blank" rel="noopener noreferrer">Open Cinema Location</a></p>
+
+</section>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script>
+  async function loadContactData() {
+    if (!window.db || typeof window.fetchMergedSiteLocationData !== "function") return;
+
+    try {
+      const pack = await window.fetchMergedSiteLocationData();
+      if (!pack || !pack.merged) return;
+
+      const data = pack.merged;
+      const loc = pack.locationDoc;
+      const addressEl = document.getElementById("contactAddress");
+      const phoneEl = document.getElementById("contactPhone");
+      const emailEl = document.getElementById("contactEmail");
+      const mapLinkEl = document.getElementById("contactMapLink");
+
+      function pickField(primary, fallback) {
+        if (primary != null && String(primary).trim() !== "") return primary;
+        return fallback;
+      }
+
+      const address = pickField(loc && (loc.address || loc.locationAddress), data.address || data.locationAddress);
+      const phone = pickField(loc && (loc.phone || loc.locationPhone), data.phone || data.locationPhone);
+      const email = pickField(loc && (loc.email || loc.locationEmail), data.email || data.locationEmail);
+      let mapUrl = pickField(loc && (loc.mapUrl || loc.locationMapUrl), data.mapUrl || data.locationMapUrl);
+      const coords = pack.coords;
+
+      if (!mapUrl && coords) {
+        mapUrl = `https://www.google.com/maps?q=${coords.lat},${coords.lng}`;
+      }
+
+      if (address && addressEl) addressEl.textContent = address;
+      if (phone && phoneEl) phoneEl.textContent = phone;
+      if (email && emailEl) emailEl.textContent = email;
+      if (mapUrl && mapLinkEl) mapLinkEl.href = mapUrl;
+    } catch (error) {
+      console.error("Failed to load contact data:", error);
+    }
+  }
+
+  loadContactData();
+</script>
+
+</body>
+</html>
