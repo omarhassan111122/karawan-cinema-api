@@ -7,10 +7,10 @@ const firebaseConfig = {
   appId: "1:279453120513:web:3f351a92b2e6302e09e800"
 };
 
-window.isFirebaseConfigured = !Object.values(firebaseConfig).some((v) => v.startsWith("PUT_YOUR_"));
+window.isFirebaseConfigured = !!firebaseConfig.apiKey;
 
 // Local: leave empty string (same origin). Hosting: set to deployed backend URL.
-window.API_BASE_URL = "https://karawan-cinema-api.onrender.com";
+window.API_BASE_URL = "https://karawan-cinema-api-production.up.railway.app";
 
 if (window.isFirebaseConfigured) {
   if (!firebase.apps.length) {
