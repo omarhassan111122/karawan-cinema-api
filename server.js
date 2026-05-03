@@ -424,5 +424,5 @@ app.post("/api/bookings", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Karawan booking API running on http://localhost:${PORT}`);
+  console.log(`Karawan booking API running on port ${PORT}`);
 });
