@@ -81,6 +81,21 @@ nav a:hover::after {
   width: 100%;
 }
 
+nav .admin-nav-item a {
+  color: #7dd3fc;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+nav .admin-nav-item a:hover {
+  color: #e0f2fe;
+}
+
+nav .admin-nav-item a::after {
+  background: #38bdf8;
+}
+
 .back-nav-btn {
   position: fixed;
   top: 92px;
@@ -1460,4 +1475,241 @@ button {
 .instapay-toast.visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+/* ===== GLOBAL RESPONSIVE ===== */
+@media (max-width: 1024px) {
+  nav {
+    padding: 16px 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  nav ul {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+
+  nav ul li {
+    margin-left: 0;
+  }
+
+  .hero,
+  .hero-home {
+    padding-left: 30px;
+    min-height: 72vh;
+  }
+
+  .hero h2 {
+    font-size: clamp(34px, 5.5vw, 46px);
+  }
+
+  .movies {
+    padding: 34px 24px;
+  }
+
+  .trailers {
+    padding: 28px 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  nav {
+    padding: 14px 16px;
+  }
+
+  .logo {
+    font-size: 24px;
+  }
+
+  nav a {
+    font-size: 14px;
+  }
+
+  .back-nav-btn {
+    top: 78px;
+    inset-inline-start: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .hero,
+  .hero-home {
+    min-height: 66vh;
+    padding: 22px 16px;
+    justify-content: flex-end;
+  }
+
+  .hero p {
+    font-size: 15px;
+    max-width: 100%;
+  }
+
+  .hero-actions {
+    flex-wrap: wrap;
+  }
+
+  .hero-stats {
+    width: 100%;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .hero-stats div {
+    min-width: 0;
+    flex: 1 1 140px;
+  }
+
+  .movies {
+    padding: 28px 16px;
+  }
+
+  .section-head {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .site-footer {
+    padding: 18px 16px 24px;
+  }
+
+  .booking {
+    margin-top: 28px;
+    gap: 16px;
+    padding: 0 10px 24px;
+  }
+
+  .booking h2 {
+    font-size: 25px;
+  }
+
+  .prebooking-card {
+    width: 100%;
+    max-width: 100%;
+    padding: 20px 14px;
+    border-radius: 12px;
+  }
+
+  .prebooking-card h3 {
+    font-size: 17px;
+    margin-bottom: 16px;
+  }
+
+  .prebooking-grid {
+    gap: 14px;
+  }
+
+  .prebooking-grid select,
+  .prebooking-grid input,
+  .google-signin-btn {
+    height: 44px;
+    font-size: 14px;
+  }
+
+  .prebooking-actions {
+    margin-top: 16px;
+  }
+
+  .prebooking-actions button {
+    height: 46px;
+    font-size: 14px;
+  }
+
+  .booking-layout {
+    width: 100%;
+    gap: 12px;
+  }
+
+  .seat-map-card {
+    padding: 12px 10px 16px;
+    border-radius: 8px;
+  }
+
+  .screen-curve {
+    font-size: 22px;
+    border-top-width: 7px;
+    padding-top: 10px;
+  }
+
+  .booking-panel {
+    padding: 12px;
+  }
+
+  .booking-panel h3 {
+    font-size: 18px;
+  }
+
+  .user-info-display {
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .user-info-display .user-details {
+    width: 100%;
+  }
+
+  .logout-btn {
+    width: 100%;
+  }
+
+  .locations-head h2 {
+    font-size: 28px;
+  }
+
+  .contact {
+    margin-top: 42px;
+    padding: 0 16px 26px;
+  }
+
+  .contact h2 {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+
+  .contact p {
+    overflow-wrap: anywhere;
+    line-height: 1.7;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo {
+    font-size: 21px;
+  }
+
+  nav ul {
+    gap: 8px 12px;
+  }
+
+  .hero h2 {
+    font-size: clamp(28px, 8vw, 34px);
+  }
+
+  .movies h2 {
+    font-size: 23px;
+  }
+
+  .movie-card {
+    --card-w: min(72vw, 190px);
+  }
+
+  .instapay-pay-page {
+    width: 100%;
+    padding: 0 10px;
+  }
+
+  .instapay-ref-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .instapay-actions {
+    flex-direction: column;
+  }
+
+  .instapay-copy-btn {
+    width: 100%;
+  }
 }

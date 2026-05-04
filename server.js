@@ -13,7 +13,8 @@
  *
  * في لوحة Paymob عيِّن «Processed / Transaction» callback URL إلى:
  *   https://YOUR-DOMAIN/api/paymob/callback
- * وصفحة عودة العميل (اختياري) → payment-done.html
+ * بعد الدفع للعميل: عيّن PUBLIC_SITE_URL — Paymob redirection_url تصبح:
+ *   PUBLIC_SITE_URL/payment-done.html?ref=<bookingId> (إيصال كامل بالمقاعد والمرجع)
  */
 require('dotenv').config();
 const express = require("express");
@@ -27,6 +28,10 @@ const paymobGateway = require("./paymob-gateway");
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const DB_PATH = path.join(__dirname, "data", "bookings.json");
+const CASHIER_SYNC_URL = String(process.env.CASHIER_SYNC_URL || "").trim();
+const CASHIER_SYNC_TOKEN = String(process.env.CASHIER_SYNC_TOKEN || "").trim();
+const CASHIER_SYNC_TIMEOUT_MS = Math.max(1000, Number(process.env.CASHIER_SYNC_TIMEOUT_MS) || 12000);
+const CASHIER_SYNC_ON = String(process.env.CASHIER_SYNC_ON || "paid").toLowerCase().trim(); // paid | all
 
 let firestoreAdmin = null;
 
@@ -61,12 +66,145 @@ function initFirebaseAdmin() {
 
 initFirebaseAdmin();
 
+function isCashierSyncConfigured() {
+  return !!CASHIER_SYNC_URL;
+}
+
+function shouldSyncCashier(eventName) {
+  if (!isCashierSyncConfigured()) return false;
+  if (CASHIER_SYNC_ON === "all") return true;
+  return eventName === "paid";
+}
+
+function toIsoDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === "function") return value.toDate().toISOString();
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
+function mapBookingForCashier(bookingId, booking, eventName) {
+  const seats = Array.isArray(booking.seats) ? booking.seats : [];
+  const isPaid = booking.paymentStatus === "paid" || booking.seatsPaid === true || booking.paymentConfirmed === true;
+  return {
+    source: "karawan-cinema-web",
+    event: eventName,
+    bookingId,
+    bookingKey: booking.bookingKey || "",
+    movie: booking.movie || "",
+    showtime: booking.showtime || "",
+    day: booking.day || "",
+    customerName: booking.customerName || booking.name || "",
+    customerPhone: booking.customerPhone || booking.phone || "",
+    customerEmail: booking.customerEmail || "",
+    seats,
+    ticketCount: Number(booking.ticketCount || seats.length || 0),
+    totalPrice: Number(booking.totalPrice || 0),
+    paymentStatus: booking.paymentStatus || "pending",
+    paymentGateway: booking.paymentGateway || "",
+    paymentMethod: booking.paymentMethod || "",
+    paid: isPaid,
+    paidAt: toIsoDate(booking.paidAt),
+    createdAt: toIsoDate(booking.createdAt)
+  };
+}
+
+async function updateCashierSyncState(bookingId, patch) {
+  if (!firestoreAdmin || !bookingId) return;
+  const prefixedPatch = {};
+  Object.keys(patch || {}).forEach((key) => {
+    prefixedPatch[`cashierSync.${key}`] = patch[key];
+  });
+  if (!Object.keys(prefixedPatch).length) return;
+  try {
+    await firestoreAdmin.collection("bookings").doc(bookingId).update(prefixedPatch);
+  } catch (error) {
+    console.warn("[cashier-sync/state-update]", bookingId, error.message);
+  }
+}
+
+async function syncBookingToCashier(bookingId, eventName) {
+  if (!shouldSyncCashier(eventName)) {
+    return { skipped: true, reason: "sync-disabled-or-event-not-selected" };
+  }
+  if (!firestoreAdmin) {
+    return { skipped: true, reason: "firebase-admin-not-ready" };
+  }
+
+  const bookingSnap = await firestoreAdmin.collection("bookings").doc(bookingId).get();
+  if (!bookingSnap.exists) {
+    return { ok: false, error: "booking-not-found" };
+  }
+  const booking = bookingSnap.data() || {};
+  const payload = mapBookingForCashier(bookingId, booking, eventName);
+
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), CASHIER_SYNC_TIMEOUT_MS);
+
+  await updateCashierSyncState(bookingId, {
+    status: "processing",
+    event: eventName,
+    lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+    targetUrl: CASHIER_SYNC_URL
+  });
+
+  try {
+    const headers = { "Content-Type": "application/json" };
+    if (CASHIER_SYNC_TOKEN) headers.Authorization = `Bearer ${CASHIER_SYNC_TOKEN}`;
+
+    const response = await fetch(CASHIER_SYNC_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+      signal: ctrl.signal
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      const bodyText = await response.text().catch(() => "");
+      await updateCashierSyncState(bookingId, {
+        status: "failed",
+        event: eventName,
+        lastError: `HTTP ${response.status}${bodyText ? ` - ${bodyText.slice(0, 400)}` : ""}`,
+        lastResponseCode: response.status
+      });
+      return { ok: false, status: response.status, error: "cashier-api-non-2xx" };
+    }
+
+    await updateCashierSyncState(bookingId, {
+      status: "synced",
+      event: eventName,
+      lastSuccessAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastError: "",
+      lastResponseCode: response.status
+    });
+    return { ok: true, status: response.status };
+  } catch (error) {
+    clearTimeout(timeout);
+    const msg = error && error.name === "AbortError" ? "request-timeout" : String(error.message || error);
+    await updateCashierSyncState(bookingId, {
+      status: "failed",
+      event: eventName,
+      lastError: msg
+    });
+    return { ok: false, error: msg };
+  }
+}
+
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
 app.get("/payment-done.html", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "payment-done.html"));
+  const publicSiteUrl = String(process.env.PUBLIC_SITE_URL || "").trim().replace(/\/+$/, "");
+  if (publicSiteUrl) {
+    // Paymob/3DS sometimes returns to the backend domain. Always bounce to the hosted receipt page.
+    // Keep the querystring (e.g. ?id=... or ?ref=...) so the frontend can resolve the booking.
+    const target = `${publicSiteUrl}${req.originalUrl}`;
+    return res.redirect(302, target);
+  }
+  return res.sendFile(path.join(__dirname, "public", "payment-done.html"));
 });
+app.use(express.static(path.join(__dirname, "public")));
 app.get("/api/payment/config", (_req, res) => {
   res.json({
     paymob: paymobGateway.isPaymobConfigured() && !!firestoreAdmin,
@@ -106,6 +244,25 @@ app.get("/api/bookings/:bookingId/payment-status", async (req, res) => {
   }
 });
 
+app.post("/api/bookings/:bookingId/sync-cashier", async (req, res) => {
+  try {
+    const bookingId = String(req.params.bookingId || "").trim();
+    if (!bookingId) return res.status(400).json({ error: "bookingId مطلوب" });
+    if (!isCashierSyncConfigured()) {
+      return res.status(503).json({ error: "فعّل CASHIER_SYNC_URL أولًا." });
+    }
+
+    const eventName = String(req.body?.event || "manual").toLowerCase().trim() || "manual";
+    const result = await syncBookingToCashier(bookingId, eventName === "manual" ? "paid" : eventName);
+    if (result.ok) return res.json({ ok: true, result });
+    if (result.skipped) return res.status(202).json({ ok: false, result });
+    return res.status(502).json({ ok: false, result });
+  } catch (error) {
+    console.error("[bookings/sync-cashier]", error);
+    return res.status(500).json({ error: "internal-error" });
+  }
+});
+
 app.post("/api/paymob/session", async (req, res) => {
   try {
     const bookingId = String(req.body.bookingId || "").trim();
@@ -141,6 +298,13 @@ app.post("/api/paymob/session", async (req, res) => {
     }
 
     const amountPiasters = Math.round(totalPrice * 100);
+
+    const hasReturnBase = !!String(process.env.PUBLIC_SITE_URL || "").trim() || !!String(process.env.PAYMOB_RETURN_URL || "").trim();
+    if (!hasReturnBase) {
+      console.warn(
+        "[paymob/session] عيّن PUBLIC_SITE_URL أو PAYMOB_RETURN_URL على السيرفر — وإلا Paymob/3DS قد يرجعك للموقع من غير فتح صفحة الإيصال."
+      );
+    }
 
     const { iframeUrl } = await paymobGateway.createPaymobIframeSession({
       merchantOrderId: bookingId,
@@ -195,6 +359,11 @@ app.post("/api/paymob/callback", async (req, res) => {
         holdExpiresAt: admin.firestore.FieldValue.delete()
       });
       console.log("[paymob/callback] paid:", merchantOrderId);
+
+      const cashierResult = await syncBookingToCashier(merchantOrderId, "paid");
+      if (!cashierResult.ok && !cashierResult.skipped) {
+        console.warn("[cashier-sync/paymob]", merchantOrderId, cashierResult);
+      }
     }
 
     return res.send("OK");
@@ -270,6 +439,12 @@ app.post("/api/qnb/callback", async (req, res) => {
         };
 
     await bookingRef.update(update);
+    if (isSuccess) {
+      const cashierResult = await syncBookingToCashier(bookingId, "paid");
+      if (!cashierResult.ok && !cashierResult.skipped) {
+        console.warn("[cashier-sync/qnb]", bookingId, cashierResult);
+      }
+    }
     return res.send("OK");
   } catch (error) {
     console.error("[qnb/callback]", error);

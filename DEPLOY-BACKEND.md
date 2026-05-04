@@ -14,8 +14,14 @@ Hosting on Firebase serves static files only. Payment endpoints under `/api/*` n
    - `PAYMOB_INTEGRATION_ID`
    - `PAYMOB_IFRAME_ID`
    - `PAYMOB_BASE` (optional)
+   - `PUBLIC_SITE_URL` (ضروري لرجوع العميل بعد الدفع إلى `payment-done.html`)
+   - `PAYMOB_RETURN_URL` (اختياري بديل لـ `PUBLIC_SITE_URL` مع `{{merchant_order_id}}`)
    - `QNB_WEBHOOK_SECRET`
    - `FIREBASE_SERVICE_ACCOUNT_JSON` (full JSON string) or attach service-account file in your host method.
+   - `CASHIER_SYNC_URL` (endpoint الخاص بنظام الكاشير الخارجي)
+   - `CASHIER_SYNC_TOKEN` (اختياري Bearer token)
+   - `CASHIER_SYNC_TIMEOUT_MS` (اختياري، الافتراضي 12000)
+   - `CASHIER_SYNC_ON` (`paid` أو `all`)
 
 After deploy, copy backend URL, e.g.:
 `https://karawan-cinema-api.onrender.com`
@@ -41,3 +47,18 @@ firebase deploy --only hosting
 - QNB callback:
   `https://<your-backend-domain>/api/qnb/callback`
   with `x-qnb-signature` matching `QNB_WEBHOOK_SECRET`.
+
+## 4) Sync booking to cashier system (external DB)
+
+بعد تفعيل المتغيرات أعلاه:
+
+- أي حجز يتم تأكيد دفعه (Paymob/QNB) سيتم إرساله تلقائيًا إلى `CASHIER_SYNC_URL`.
+- حالة المزامنة تُحفظ داخل مستند الحجز في Firestore تحت الحقل `cashierSync`.
+- لإعادة المحاولة يدويًا:
+
+```bash
+POST https://<your-backend-domain>/api/bookings/<BOOKING_ID>/sync-cashier
+Content-Type: application/json
+
+{ "event": "manual" }
+```

@@ -24,6 +24,32 @@
       margin-bottom: 12px;
     }
 
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .stat-card {
+      background: #0b1220;
+      border: 1px solid #263043;
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .stat-card p {
+      color: #93c5fd;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .stat-card strong {
+      color: #e5e7eb;
+      font-size: 24px;
+      line-height: 1;
+    }
+
     .bookings-table {
       width: 100%;
       border-collapse: collapse;
@@ -155,6 +181,25 @@
         <button class="btn btn-add" type="submit">إضافة حجز</button>
       </form>
 
+      <div class="stats-grid">
+        <div class="stat-card">
+          <p>تذاكر أونلاين اليوم</p>
+          <strong id="statTicketsToday">0</strong>
+        </div>
+        <div class="stat-card">
+          <p>الحجوزات اليوم</p>
+          <strong id="statBookingsToday">0</strong>
+        </div>
+        <div class="stat-card">
+          <p>مدفوع اليوم</p>
+          <strong id="statPaidToday">0</strong>
+        </div>
+        <div class="stat-card">
+          <p>معلّق/لوك الآن</p>
+          <strong id="statPendingNow">0</strong>
+        </div>
+      </div>
+
       <table class="bookings-table">
         <thead>
           <tr>
@@ -166,12 +211,13 @@
             <th>المقاعد</th>
             <th>عدد التذاكر</th>
             <th>الإجمالي</th>
+            <th>حالة الدفع</th>
             <th>تحكم</th>
           </tr>
         </thead>
         <tbody id="bookingsBody">
           <tr>
-            <td colspan="9">جاري تحميل الحجوزات...</td>
+            <td colspan="10">جاري تحميل الحجوزات...</td>
           </tr>
         </tbody>
       </table>
@@ -202,7 +248,18 @@
     const seatsInput = document.getElementById("seatsInput");
     const bookingsBody = document.getElementById("bookingsBody");
     const statusMsg = document.getElementById("statusMsg");
+    const statTicketsToday = document.getElementById("statTicketsToday");
+    const statBookingsToday = document.getElementById("statBookingsToday");
+    const statPaidToday = document.getElementById("statPaidToday");
+    const statPendingNow = document.getElementById("statPendingNow");
     let unsubscribeBookings = null;
+
+    function getOwnerAdminEmail() {
+      const raw = window.KARAWAN_OWNER_ADMIN_EMAIL;
+      return String(raw == null ? "" : raw)
+        .trim()
+        .toLowerCase();
+    }
 
     function showAdminUI() {
       authSection.classList.add("hidden");
@@ -212,7 +269,11 @@
     function showAuthUI() {
       adminSection.classList.add("hidden");
       authSection.classList.remove("hidden");
-      bookingsBody.innerHTML = '<tr><td colspan="9">سجل الدخول لعرض الحجوزات.</td></tr>';
+      bookingsBody.innerHTML = '<tr><td colspan="10">سجل الدخول لعرض الحجوزات.</td></tr>';
+      statTicketsToday.textContent = "0";
+      statBookingsToday.textContent = "0";
+      statPaidToday.textContent = "0";
+      statPendingNow.textContent = "0";
     }
 
     function formatDate(value) {
@@ -225,9 +286,67 @@
       return parsed.toLocaleString("ar-EG");
     }
 
+    function toMillis(value) {
+      if (!value) return null;
+      if (typeof value.toMillis === "function") return value.toMillis();
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.getTime();
+    }
+
+    function paymentStatusLabel(booking) {
+      const status = String(booking.paymentStatus || "").toLowerCase().trim();
+      if (status === "paid" || booking.seatsPaid === true) return "مدفوع";
+      if (status === "pending_hold") return "معلّق (لوك 5 دق)";
+      if (status === "expired" || booking.paymentReleased === true) return "منتهي/اتحرر";
+      if (status === "failed") return "فشل دفع";
+      return status || "غير محدد";
+    }
+
+    function computeTodayStats(bookings) {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const tomorrowStart = todayStart + 24 * 60 * 60 * 1000;
+      const nowMs = Date.now();
+      let ticketsToday = 0;
+      let bookingsToday = 0;
+      let paidToday = 0;
+      let pendingNow = 0;
+
+      bookings.forEach((booking) => {
+        const createdAtMs = toMillis(booking.createdAt);
+        const ticketCount = Number(booking.ticketCount || (Array.isArray(booking.seats) ? booking.seats.length : 0) || 0);
+        const status = String(booking.paymentStatus || "").toLowerCase().trim();
+        const holdExpiresMs = toMillis(booking.holdExpiresAt);
+        const isPaid = status === "paid" || booking.seatsPaid === true || booking.paymentConfirmed === true;
+        const isPendingActive =
+          status === "pending_hold" &&
+          booking.paymentReleased !== true &&
+          (!holdExpiresMs || nowMs < holdExpiresMs);
+
+        if (createdAtMs && createdAtMs >= todayStart && createdAtMs < tomorrowStart) {
+          bookingsToday += 1;
+          ticketsToday += ticketCount;
+          if (isPaid) paidToday += ticketCount;
+        }
+
+        if (isPendingActive) pendingNow += ticketCount;
+      });
+
+      return { ticketsToday, bookingsToday, paidToday, pendingNow };
+    }
+
+    function renderStats(bookings) {
+      const stats = computeTodayStats(bookings);
+      statTicketsToday.textContent = String(stats.ticketsToday);
+      statBookingsToday.textContent = String(stats.bookingsToday);
+      statPaidToday.textContent = String(stats.paidToday);
+      statPendingNow.textContent = String(stats.pendingNow);
+    }
+
     function drawRows(bookings) {
       if (!bookings.length) {
-        bookingsBody.innerHTML = '<tr><td colspan="9">لا توجد حجوزات حتى الآن.</td></tr>';
+        bookingsBody.innerHTML = '<tr><td colspan="10">لا توجد حجوزات حتى الآن.</td></tr>';
         return;
       }
 
@@ -241,6 +360,7 @@
           <td>${Array.isArray(booking.seats) ? booking.seats.join(", ") : "-"}</td>
           <td>${booking.ticketCount || 0}</td>
           <td>${booking.totalPrice || 0} EGP</td>
+          <td>${paymentStatusLabel(booking)}</td>
           <td><button class="btn-delete" data-id="${booking.id}">حذف</button></td>
         </tr>
       `).join("");
@@ -309,7 +429,7 @@
     function startBookingsListener() {
       if (!isFirebaseConfigured || !db) {
         statusMsg.textContent = "Firebase غير مفعّل. راجع إعدادات firebase.js";
-        bookingsBody.innerHTML = '<tr><td colspan="9">لا يمكن تحميل الحجوزات.</td></tr>';
+        bookingsBody.innerHTML = '<tr><td colspan="10">لا يمكن تحميل الحجوزات.</td></tr>';
         return;
       }
 
@@ -320,11 +440,12 @@
         .onSnapshot((snapshot) => {
           const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
           drawRows(data);
+          renderStats(data);
           statusMsg.textContent = `إجمالي الحجوزات: ${data.length}`;
         }, (error) => {
           console.error("Bookings listener error:", error);
           statusMsg.textContent = "حصل خطأ أثناء قراءة الحجوزات من Firebase.";
-          bookingsBody.innerHTML = '<tr><td colspan="9">تعذر تحميل الحجوزات.</td></tr>';
+          bookingsBody.innerHTML = '<tr><td colspan="10">تعذر تحميل الحجوزات.</td></tr>';
         });
     }
 
@@ -359,6 +480,21 @@
           unsubscribeBookings();
           unsubscribeBookings = null;
         }
+        showAuthUI();
+        return;
+      }
+
+      const currentEmail = String(user.email || "").toLowerCase().trim();
+      const ownerEmail = getOwnerAdminEmail();
+      if (!ownerEmail || !ownerEmail.includes("@")) {
+        authMsg.textContent = "فعِّل حساب الأدمن: ضع إيميلك في firebase.js ضمن المتغير KARAWAN_OWNER_ADMIN_EMAIL ثم أعد رفع الموقع.";
+        auth.signOut();
+        showAuthUI();
+        return;
+      }
+      if (currentEmail !== ownerEmail) {
+        authMsg.textContent = "غير مصرح لك بدخول لوحة الأدمن.";
+        auth.signOut();
         showAuthUI();
         return;
       }

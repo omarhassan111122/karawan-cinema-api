@@ -13,6 +13,9 @@ window.auth = null;
 // Local: leave empty string (same origin). Hosting: set to deployed backend URL.
 window.API_BASE_URL = "https://karawan-cinema-api-production.up.railway.app";
 
+/** إيميل الأدمن (نفس المستخدم اللي بتسجله في Firebase Authentication بـ Email/Password). يفعّل رابط Admin في شريط التنقل + دخول admin-bookings. */
+window.KARAWAN_OWNER_ADMIN_EMAIL = "n129omarhassan@gmail.com";
+
 try {
   if (typeof firebase === 'undefined') {
     console.warn('Firebase SDK not loaded. Check script tags.');

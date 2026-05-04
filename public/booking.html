@@ -2,17 +2,192 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>حجز المقاعد</title>
 <link rel="stylesheet" href="css/style.css">
+<style id="bookingSuccessStyles">
+  .booking-success-screen {
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 40px !important;
+  }
+  /* Receipt must NEVER render on booking page (moved to payment-done.html). */
+  #bookingSuccessScreen {
+    display: none !important;
+  }
+  .success-receipt-shell {
+    width: min(480px, 96vw);
+  }
+  .success-hero {
+    text-align: center;
+    padding: 20px 16px;
+    margin-bottom: 8px;
+  }
+  .success-hero .success-en {
+    font-size: clamp(1.5rem, 5vw, 2rem);
+    font-weight: 900;
+    color: #4ade80;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+  .success-hero .success-ar {
+    font-size: clamp(1.2rem, 4vw, 1.55rem);
+    font-weight: 800;
+    color: #bbf7d0;
+    margin-bottom: 12px;
+  }
+  .success-hero .success-hint {
+    color: #94a3b8;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+  .success-card {
+    background: linear-gradient(165deg, rgba(15,23,42,0.96), rgba(30,41,59,0.9));
+    border: 2px solid rgba(74, 222, 128, 0.35);
+    border-radius: 18px;
+    padding: 20px 18px;
+    box-shadow: 0 24px 50px rgba(2, 6, 23, 0.55);
+  }
+  .success-badge-paid {
+    text-align: center;
+    padding: 10px;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+  .success-badge-paid.ok {
+    background: rgba(34, 197, 94, 0.22);
+    color: #bbf7d0;
+    border: 1px solid rgba(74, 222, 128, 0.45);
+  }
+  .success-badge-paid.wait {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fde68a;
+    border: 1px solid rgba(251, 191, 36, 0.4);
+  }
+  .success-badge-paid.bad {
+    background: rgba(239, 68, 68, 0.15);
+    color: #fecaca;
+    border: 1px solid rgba(248, 113, 113, 0.4);
+  }
+  .success-ref-block {
+    text-align: center;
+    padding: 14px;
+    margin-bottom: 14px;
+    border-radius: 12px;
+    background: rgba(2, 6, 23, 0.55);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+  }
+  .success-ref-block span {
+    display: block;
+    font-size: 12px;
+    color: #93c5fd;
+    margin-bottom: 6px;
+  }
+  .success-ref-block code {
+    word-break: break-all;
+    font-size: 14px;
+    color: #f1f5f9;
+    font-family: ui-monospace, monospace;
+    direction: ltr;
+    display: inline-block;
+  }
+  .success-rows { display: grid; gap: 8px; }
+  .success-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px dashed rgba(148, 163, 184, 0.2);
+    font-size: 15px;
+    align-items: baseline;
+  }
+  .success-row:last-child { border-bottom: none; }
+  .success-row > span:first-child {
+    color: #94a3b8;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .success-row strong {
+    color: #e2e8f0;
+    text-align: left;
+    direction: ltr;
+    unicode-bidi: isolate;
+    font-weight: 700;
+  }
+  .success-seats {
+    grid-template-columns: 1fr !important;
+  }
+  .success-seats strong {
+    text-align: center !important;
+    font-size: clamp(22px, 7vw, 30px);
+    font-weight: 900;
+    color: #38bdf8 !important;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+  .success-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 22px;
+  }
+  .success-actions button {
+    flex: 1 1 150px;
+  }
+  @media print {
+    nav,
+    .back-nav-btn,
+    #successNewBookingBtn {
+      display: none !important;
+    }
+    .booking-success-screen {
+      padding-top: 12px !important;
+    }
+    body {
+      background: #fff !important;
+    }
+    .success-card {
+      box-shadow: none !important;
+      border: 1px solid #ccc !important;
+    }
+    .success-hero .success-en,
+    .success-hero .success-ar,
+    .success-row strong,
+    .success-ref-block code {
+      color: #111 !important;
+    }
+    .success-row > span:first-child {
+      color: #444 !important;
+    }
+  }
+</style>
 </head>
 <body>
+<script src="post-pay-redirect.js"></script>
 
 <nav>
   <h1 class="logo">Karawan Cinema 🎬</h1>
+  <ul>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="movies.html">About</a></li>
+    <li><a href="booking.html">Booking</a></li>
+    <li><a href="locations.html">Locations</a></li>
+    <li><a href="contact.html">Contact</a></li>
+    <li class="admin-nav-item" hidden><a href="admin-bookings.html">Admin</a></li>
+  </ul>
 </nav>
 <button class="back-nav-btn" type="button" onclick="if (history.length > 1) { history.back(); } else { window.location.href='index.html'; }">⟵ Back</button>
 
-<section class="booking">
+<section id="bookingWorkflow" class="booking">
   <h2>حجز التذاكر</h2>
 
   <div class="prebooking-card">
@@ -110,10 +285,54 @@
 
 </section>
 
+<section id="bookingSuccessScreen" class="booking booking-success-screen" hidden aria-live="polite">
+  <div class="success-receipt-shell">
+    <div class="success-hero">
+      <div class="success-en">Booking Successful!</div>
+      <div class="success-ar">تم الحجز بنجاح</div>
+      <p class="success-hint">
+        احتفظ بلقطة شاشة لهذه الصفحة أو استخدم زر الطباعة واحضر الإيصال معك عند زيارتك للسينما.
+      </p>
+    </div>
+
+    <div class="success-card">
+      <div id="successPayBadge" class="success-badge-paid ok"></div>
+
+      <div class="success-ref-block">
+        <span>رقم مرجع الحجز — اعرضه عند شباك التذاكر</span>
+        <code id="successBookingRef">—</code>
+      </div>
+
+      <div class="success-rows">
+        <div class="success-row"><span>حالة الدفع</span><strong id="successPayStatus">—</strong></div>
+        <div class="success-row"><span>الفيلم</span><strong id="successMovie">—</strong></div>
+        <div class="success-row"><span>الحفلة</span><strong id="successShowtime">—</strong></div>
+        <div class="success-row"><span>اليوم</span><strong id="successDay">—</strong></div>
+        <div class="success-row success-seats">
+          <span>المقاعد المحجوزة</span>
+          <strong id="successSeats">—</strong>
+        </div>
+        <div class="success-row"><span>عدد التذاكر</span><strong id="successTicketCount">—</strong></div>
+        <div class="success-row"><span>الإجمالي</span><strong id="successTotal">—</strong></div>
+        <div class="success-row"><span>اسم العميل</span><strong id="successCustomerName">—</strong></div>
+        <div class="success-row"><span>الموبايل</span><strong id="successPhone">—</strong></div>
+      </div>
+
+      <div class="success-actions">
+        <button type="button" id="successScreenshotBtn">طباعة / حفظ PDF</button>
+        <button type="button" id="successNewBookingBtn" class="back-nav-hidden-print">حجز جديد</button>
+      </div>
+
+      <p id="successFooterNote" class="success-hint" style="margin-top:14px;"></p>
+    </div>
+  </div>
+</section>
+
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="firebase.js"></script>
+<script src="admin-nav.js"></script>
 <script>
   const db = window.db;
   const isFirebaseConfigured = window.isFirebaseConfigured;
@@ -148,6 +367,86 @@
   let qnbVisaUrlTemplate = "";
 
   bookingLayout.style.display = "none";
+
+  const bookingWorkflowEl = document.getElementById("bookingWorkflow");
+  const bookingSuccessScreenEl = document.getElementById("bookingSuccessScreen");
+  const LS_BOOKING_KEY = "karawan_last_booking_id";
+  const LS_EXPECT_UNTIL_KEY = "karawan_expect_receipt_until";
+  const EXPECT_WINDOW_MS = 20 * 60 * 1000;
+
+  function formatSeatsReceipt(seats) {
+    if (!Array.isArray(seats) || !seats.length) return "—";
+    return seats.map((s) => String(s).trim().toUpperCase()).join("، ");
+  }
+
+  function bookingIsPaid(data) {
+    return data.paymentStatus === "paid" || data.seatsPaid === true || data.paymentConfirmed === true;
+  }
+
+  function fillSuccessReceiptUI(data, refId) {
+    document.getElementById("successBookingRef").textContent = refId;
+    document.getElementById("successMovie").textContent = data.movie || "—";
+    document.getElementById("successShowtime").textContent = data.showtime || "—";
+    document.getElementById("successDay").textContent = data.day || "—";
+    document.getElementById("successSeats").textContent = formatSeatsReceipt(data.seats);
+    document.getElementById("successTicketCount").textContent = String(
+      data.ticketCount || (Array.isArray(data.seats) ? data.seats.length : 0) || "0"
+    );
+    document.getElementById("successTotal").textContent = (data.totalPrice != null ? data.totalPrice : "—") + " ج.م";
+    document.getElementById("successCustomerName").textContent = data.customerName || "—";
+    document.getElementById("successPhone").textContent = data.customerPhone || "—";
+
+    const badge = document.getElementById("successPayBadge");
+    const payStrong = document.getElementById("successPayStatus");
+    const st = String(data.paymentStatus || "").toLowerCase();
+
+    if (bookingIsPaid(data)) {
+      badge.className = "success-badge-paid ok";
+      badge.textContent = "تم تأكيد الدفع — يمكنك تصوير هذه الصفحة كإثبات";
+      payStrong.textContent = "مدفوع";
+      document.getElementById("successFooterNote").textContent = "";
+    } else if (st === "pending_hold") {
+      badge.className = "success-badge-paid wait";
+      badge.textContent = "في انتظار تأكيد الدفع من البنك — حدّث الصفحة خلال دقيقة إن لزم";
+      payStrong.textContent = "قيد التأكيد";
+      document.getElementById("successFooterNote").textContent =
+        "لو مازال يظهر «قيد التأكيد» بعد دفعتك، انتظر قليلًا ثم اضغط تحديث المتصفح؛ التأكيد يصل من بوابة الدفع تلقائيًا.";
+    } else if (st === "expired") {
+      badge.className = "success-badge-paid bad";
+      badge.textContent = "انتهت مهلة الحجز — المقاعد قد تكون أُفرجت";
+      payStrong.textContent = "منتهي";
+      document.getElementById("successFooterNote").textContent =
+        "إذا دفعت وفاتتك المهلة، تواصل مع السينما مع رقم المرجع أعلاه.";
+    } else {
+      badge.className = "success-badge-paid wait";
+      badge.textContent = "تحقق من حالة الدفع";
+      payStrong.textContent = data.paymentStatus || "—";
+      document.getElementById("successFooterNote").textContent =
+        "احتفظ برقم المرجع والمقاعد كما في الأعلى إلى أن يظهر «مدفوع».";
+    }
+  }
+
+  function clearReceiptSessionFlags() {
+    try {
+      sessionStorage.removeItem(LS_BOOKING_KEY);
+      sessionStorage.removeItem(LS_EXPECT_UNTIL_KEY);
+    } catch (e) {}
+  }
+
+  function startSuccessScreenFromUrl() {
+    const params = new URLSearchParams(location.search);
+    const refInQuery = (params.get("ref") || params.get("bookingId") || params.get("id") || "").trim();
+    if (!refInQuery) return;
+    try {
+      const u = new URL("payment-done.html", window.location.href);
+      u.searchParams.set("ref", refInQuery);
+      window.location.replace(u.pathname + u.search + u.hash);
+    } catch (e) {
+      window.location.replace("payment-done.html?ref=" + encodeURIComponent(refInQuery));
+    }
+  }
+
+  startSuccessScreenFromUrl();
 
   async function loadQnbPaymentSettings() {
     qnbVisaPaymentLink = "";
@@ -432,6 +731,7 @@
   let reservedSeatsUnsubscribe = null;
   let cachedHoldBookings = [];
   let holdRecheckInterval = null;
+  const releasingExpiredBookingIds = new Set();
 
   function stopReservedSeatListener() {
     if (typeof reservedSeatsUnsubscribe === "function") {
@@ -455,6 +755,37 @@
     applyReservedSeats(reservedSeats);
   }
 
+  async function releaseExpiredHoldsFromCache() {
+    if (!bookingsRef || !cachedHoldBookings.length) return;
+    const nowMs = Date.now();
+
+    const tasks = cachedHoldBookings.map(async (booking) => {
+      const bookingId = booking.id;
+      if (!bookingId || releasingExpiredBookingIds.has(bookingId)) return;
+      if (booking.cancelled === true || booking.paymentReleased === true) return;
+      if (booking.paymentStatus === "paid" || booking.paymentConfirmed === true || booking.seatsPaid === true) return;
+
+      const expMs = expiryMs(booking.holdExpiresAt);
+      if (!Number.isFinite(expMs) || nowMs < expMs) return;
+
+      releasingExpiredBookingIds.add(bookingId);
+      try {
+        await bookingsRef.doc(bookingId).update({
+          paymentStatus: "expired",
+          paymentReleased: true,
+          holdExpiresAt: firebase.firestore.FieldValue.delete(),
+          paymentFailedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (error) {
+        console.warn("Failed to release expired hold:", bookingId, error);
+      } finally {
+        releasingExpiredBookingIds.delete(bookingId);
+      }
+    });
+
+    await Promise.all(tasks);
+  }
+
   /**
    * لمزامنة فورية: أي حجز يُكتب على Firebase له نفس الفيلم/الحفلة/اليوم
    * يحدّث المقاعد الحمراء لكل المتصفّحين فورًا.
@@ -472,15 +803,19 @@
         (snapshot) => {
           cachedHoldBookings = [];
           snapshot.forEach((doc) => {
-            cachedHoldBookings.push(doc.data());
+            cachedHoldBookings.push({ id: doc.id, ...doc.data() });
           });
           recomputeSeatHoldsFromCache();
+          releaseExpiredHoldsFromCache();
           if (bookingLayout.style.display === "grid") {
             bookingState.textContent =
               "اختيار المقاعد — الأحمر = محجوز مؤقتًا (دفع خلال " + PAY_HOLD_MINUTES + " دق) أو مؤكد بعد الدفع";
           }
           if (holdRecheckInterval !== null) clearInterval(holdRecheckInterval);
-          holdRecheckInterval = window.setInterval(recomputeSeatHoldsFromCache, HOLD_RECHECK_MS);
+          holdRecheckInterval = window.setInterval(() => {
+            recomputeSeatHoldsFromCache();
+            releaseExpiredHoldsFromCache();
+          }, HOLD_RECHECK_MS);
         },
         (error) => {
           console.error("Reserved seats listener error:", error);
@@ -570,6 +905,13 @@
   }
 
   confirmInfoBtn.addEventListener("click", () => {
+    if (!isGoogleAuthRequiredSatisfied()) {
+      prebookingMsg.textContent = "لازم تسجيل الدخول بجوجل قبل تأكيد البيانات.";
+      prebookingMsg.style.color = "#f87171";
+      bookingLayout.style.display = "none";
+      return;
+    }
+
     const movieId = movieSelect.value.trim();
     const movie = getMovieTitle(movieId);
     const showtime = showtimeSelect.value.trim();
@@ -749,6 +1091,11 @@
   });
 
   finalConfirmBtn.addEventListener("click", async () => {
+    if (!isGoogleAuthRequiredSatisfied()) {
+      bookingState.textContent = "لازم تسجيل الدخول بجوجل قبل تأكيد الحجز.";
+      return;
+    }
+
     const selectedSeats = Array.from(document.querySelectorAll(".seat.selected"));
     if (!selectedSeats.length) {
       bookingState.textContent = "اختار مقعد واحد على الأقل";
@@ -811,6 +1158,14 @@
             });
             if (r.ok && j && j.url) {
               bookingState.textContent = "جاري تحويلك لبوابة الدفع الإلكتروني (Paymob)…";
+              try {
+                sessionStorage.setItem(LS_BOOKING_KEY, docId);
+                sessionStorage.setItem(LS_EXPECT_UNTIL_KEY, String(Date.now() + EXPECT_WINDOW_MS));
+                sessionStorage.setItem("karawan_after_paymob", "1");
+                localStorage.setItem("karawan_after_paymob", "1");
+                localStorage.setItem("karawan_receipt_ref", docId);
+                localStorage.setItem("karawan_receipt_ref_exp", String(Date.now() + 45 * 60 * 1000));
+              } catch (e) {}
               window.location.assign(j.url);
               return;
             }
@@ -882,6 +1237,24 @@
   const userName = document.getElementById("userName");
   const userEmail = document.getElementById("userEmail");
   const customerName = document.getElementById("customerName");
+  const customerPhone = document.getElementById("customerPhone");
+  function getCurrentUser() {
+    if (!window.auth || !firebase.auth) return null;
+    return firebase.auth().currentUser;
+  }
+
+  function isGoogleAuthRequiredSatisfied() {
+    return !!getCurrentUser();
+  }
+
+  function setBookingInputsDisabled(disabled) {
+    movieSelect.disabled = disabled;
+    showtimeSelect.disabled = disabled;
+    customerName.disabled = disabled;
+    customerPhone.disabled = disabled;
+    confirmInfoBtn.disabled = disabled;
+    finalConfirmBtn.disabled = disabled;
+  }
 
   // Check auth state on page load
   function checkAuthState() {
@@ -899,6 +1272,7 @@
   function showUserInfo(user) {
     authSection.style.display = "none";
     userInfoSection.style.display = "block";
+    setBookingInputsDisabled(false);
     userPhoto.src = user.photoURL || "https://ui-avatars.com/api/?name=" + encodeURIComponent(user.displayName || "User") + "&background=60a5fa&color=fff";
     userName.textContent = user.displayName || "مستخدم";
     userEmail.textContent = user.email;
@@ -912,6 +1286,11 @@
   function showSignInButton() {
     authSection.style.display = "block";
     userInfoSection.style.display = "none";
+    setBookingInputsDisabled(true);
+    bookingLayout.style.display = "none";
+    bookingState.textContent = "بانتظار تسجيل الدخول بحساب Google";
+    prebookingMsg.textContent = "سجّل دخولك بجوجل لإكمال الحجز.";
+    prebookingMsg.style.color = "#94a3b8";
   }
 
   // Google Sign-In
@@ -923,26 +1302,43 @@
     }
 
     const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    googleSignInBtn.disabled = true;
+    googleSignInBtn.style.opacity = "0.7";
+    googleSignInBtn.style.cursor = "not-allowed";
     
     try {
-      const result = await firebase.auth().signInWithPopup(provider);
-      const user = result.user;
-      showUserInfo(user);
-      prebookingMsg.textContent = "تم تسجيل الدخول بنجاح!";
-      prebookingMsg.style.color = "#4bd367";
+      const popupResult = await firebase.auth().signInWithPopup(provider);
+      if (popupResult && popupResult.user) {
+        showUserInfo(popupResult.user);
+        prebookingMsg.textContent = "تم تسجيل الدخول بنجاح!";
+        prebookingMsg.style.color = "#4bd367";
+      }
+      return;
     } catch (error) {
       console.error("Google Sign-In Error:", error);
       const errorCode = error.code;
-      const errorMessage = error.message;
       
       if (errorCode === 'auth/popup-closed-by-user') {
-        prebookingMsg.textContent = "تم إغلاق نافذة تسجيل الدخول.";
-      } else if (errorCode === 'auth/popup-blocked') {
-        prebookingMsg.textContent = "تم حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع.";
+        prebookingMsg.textContent = "تم إلغاء تسجيل الدخول.";
+      } else if (errorCode === "auth/cancelled-popup-request") {
+        prebookingMsg.textContent = "جارٍ تنفيذ تسجيل الدخول... انتظر لحظة.";
+        prebookingMsg.style.color = "#fbbf24";
+        return;
+      } else if (errorCode === "auth/unauthorized-domain") {
+        prebookingMsg.textContent = "الدومين الحالي غير مضاف في Firebase Authorized domains.";
+      } else if (errorCode === "auth/popup-blocked") {
+        prebookingMsg.textContent = "المتصفح منع نافذة تسجيل الدخول. اسمح بالـ Popups ثم حاول مرة واحدة.";
+      } else if (errorCode === "auth/operation-not-supported-in-this-environment") {
+        prebookingMsg.textContent = "البيئة الحالية لا تدعم Google Sign-In. افتح الموقع في Chrome أو Edge.";
       } else {
-        prebookingMsg.textContent = "حدث خطأ أثناء تسجيل الدخول: " + errorMessage;
+        prebookingMsg.textContent = "تعذر تسجيل الدخول الآن. جرّب مرة أخرى.";
       }
       prebookingMsg.style.color = "#f87171";
+    } finally {
+      googleSignInBtn.disabled = false;
+      googleSignInBtn.style.opacity = "";
+      googleSignInBtn.style.cursor = "";
     }
   });
 
@@ -963,6 +1359,7 @@
   });
 
   // Initialize auth state check
+  setBookingInputsDisabled(true);
   checkAuthState();
 </script>
 

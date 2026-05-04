@@ -6,6 +6,11 @@
  *   PAYMOB_IFRAME_ID       — IFrame identifier (يبدو في رابط لوحة iframe)
  *
  * عنوان Paymob الغالب للإنتاج: https://accept.paymob.com (قد يستخدم البعض subdomain آخر بعد التسجيل)
+ *
+ * إرجاع العميل بعد الدفع / 3DS:
+ *   PUBLIC_SITE_URL → يُبنى منها payment-done.html?ref=<merchant_order_id>
+ *   أو PAYMOB_RETURN_URL كاملًا مع {{merchant_order_id}}
+ *   PAYMOB_DUPLICATE_REDIRECT_FIELD=1 → يُرسل أيضًا redirect_url (بعض إعدادات Accept)
  */
 const PAYMOB_BASE = process.env.PAYMOB_BASE || "https://accept.paymob.com";
 
@@ -106,6 +111,30 @@ async function createPaymobIframeSession({
     integration_id: integrationId,
     lock_order_when_paid: "false"
   };
+
+  const customReturn = String(process.env.PAYMOB_RETURN_URL || "").trim();
+  const publicSiteUrl = String(process.env.PUBLIC_SITE_URL || "").trim().replace(/\/+$/, "");
+
+  let receiptUrl = "";
+  if (customReturn) {
+    receiptUrl = customReturn
+      .split("{{merchant_order_id}}")
+      .join(String(merchantOrderId))
+      .split("{merchant_order_id}")
+      .join(String(merchantOrderId));
+  } else if (publicSiteUrl) {
+    receiptUrl = `${publicSiteUrl}/payment-done.html?ref=${encodeURIComponent(String(merchantOrderId))}`;
+  }
+
+  if (receiptUrl) {
+    keyPayload.redirection_url = receiptUrl;
+    // Different Paymob/Accept setups may expect different field names.
+    // We set the common variants to maximize successful return-to-site after 3DS.
+    keyPayload.redirect_url = receiptUrl;
+    keyPayload.return_url = receiptUrl;
+    // Keep optional flag for backwards compatibility (no-op now, but left intentionally).
+    void String(process.env.PAYMOB_DUPLICATE_REDIRECT_FIELD || "").trim();
+  }
 
   const keyRes = await postJson(`${PAYMOB_BASE}/api/acceptance/payment_keys`, keyPayload);
   const paymentToken = keyRes.token;

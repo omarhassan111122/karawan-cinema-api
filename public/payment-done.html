@@ -1,72 +1,304 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>تم الدفع بنجاح</title>
-
-<style>
-body {
-  margin: 0;
-  font-family: Arial;
-  background: linear-gradient(135deg, #0f0f0f, #1a0000);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  text-align: center;
-}
-
-.card {
-  background: #1c1c1c;
-  padding: 40px;
-  border-radius: 16px;
-  box-shadow: 0 0 20px rgba(255,0,0,0.3);
-  max-width: 400px;
-}
-
-h1 {
-  color: #00e676;
-  margin-bottom: 10px;
-}
-
-p {
-  color: #ccc;
-  margin-bottom: 20px;
-}
-
-.btn {
-  display: inline-block;
-  padding: 10px 20px;
-  background: #e53935;
-  color: white;
-  text-decoration: none;
-  border-radius: 8px;
-}
-
-.btn:hover {
-  background: #c62828;
-}
-</style>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
+  <title>إيصال الحجز — Karawan Cinema</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .done-page { min-height: 100vh; padding: 28px 16px 48px; display: flex; flex-direction: column; align-items: center; }
+    .done-shell { width: min(500px, 100%); }
+    .done-paid-head {
+      text-align: center; margin-bottom: 16px; padding-bottom: 16px;
+      border-bottom: 1px solid rgba(148,163,184,0.25);
+    }
+    .done-paid-head .en { font-size: clamp(1.5rem,5vw,1.95rem); font-weight: 900; color: #4ade80; letter-spacing: 0.03em; }
+    .done-paid-head .ar { font-size: clamp(1.15rem,4vw,1.45rem); font-weight: 800; color: #bbf7d0; margin-top: 6px; }
+    .done-paid-head .paid-line { margin-top: 12px; font-size: 1rem; font-weight: 700; color: #7dd3fc; }
+    .done-card {
+      background: linear-gradient(165deg, rgba(15,23,42,0.96), rgba(30,41,59,0.92));
+      border: 2px solid rgba(74,222,128,0.35); border-radius: 18px; padding: 22px 18px;
+      box-shadow: 0 24px 50px rgba(2,6,23,0.55); margin-bottom: 16px;
+    }
+    .done-badge {
+      padding: 10px 12px; border-radius: 12px; font-weight: 800; font-size: 14px;
+      margin-bottom: 14px; text-align: center;
+    }
+    .done-badge.ok { background: rgba(34,197,94,0.22); border: 1px solid rgba(74,222,128,0.45); color: #bbf7d0; }
+    .done-badge.wait { background: rgba(245,158,11,0.15); border: 1px solid rgba(251,191,36,0.4); color: #fde68a; }
+    .done-badge.bad { background: rgba(239,68,68,0.15); border: 1px solid rgba(248,113,113,0.45); color: #fecaca; }
+    .done-ref-box {
+      text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px;
+      background: rgba(2,6,23,0.55); border: 1px solid rgba(96,165,250,0.35);
+    }
+    .done-ref-box span { display: block; font-size: 12px; color: #93c5fd; margin-bottom: 8px; }
+    .done-ref-box code {
+      word-break: break-all; font-size: 13px; color: #f8fafc; font-family: ui-monospace, monospace;
+      direction: ltr; display: inline-block;
+    }
+    .done-rows { display: grid; gap: 0; }
+    .done-row {
+      display: grid; grid-template-columns: 1fr auto; gap: 10px;
+      align-items: baseline; padding: 10px 0; border-bottom: 1px dashed rgba(148,163,184,0.2);
+      font-size: 15px;
+    }
+    .done-row:last-child { border-bottom: none; }
+    .done-row > span:first-child { color: #94a3b8; font-weight: 600; font-size: 13px; }
+    .done-row strong { color: #e2e8f0; direction: ltr; unicode-bidi: isolate; font-weight: 700; text-align: left; }
+    .done-seats-row { grid-template-columns: 1fr !important; }
+    .done-seats-row strong {
+      margin-top: 8px; text-align: center !important; direction: ltr;
+      font-size: clamp(20px,6vw,28px); font-weight: 900; color: #38bdf8 !important;
+      letter-spacing: 0.06em; text-transform: uppercase; font-family: ui-monospace, monospace;
+    }
+    .done-hint {
+      font-size: 13px; color: #94a3b8; line-height: 1.65; text-align: center;
+      margin: 14px 0 0;
+    }
+    .done-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 18px; }
+    .done-actions a, .done-actions button { flex: 1 1 140px; text-align: center; justify-content: center; }
+    #doneErr { max-width: 420px; text-align: center; color: #fca5a5; padding: 20px; }
+    @media print {
+      nav,
+      .done-actions {
+        display: none !important;
+      }
+      body { background: #fff !important; }
+      .done-card { box-shadow: none !important; border: 1px solid #bbb !important; }
+      .done-paid-head .en, .done-paid-head .ar, .done-row strong { color: #111 !important; }
+      .done-row > span:first-child { color: #444 !important; }
+    }
+  </style>
 </head>
-
 <body>
-
-<div class="card">
-  <h1>✔ تم الدفع بنجاح</h1>
-  <p>شكراً لاستخدامك Karawan Cinema 🎬</p>
-  <p>سيتم تحويلك تلقائيًا بعد ثواني...</p>
-
-  <a href="booking.html" class="btn">العودة للحجز</a>
-</div>
-
 <script>
-setTimeout(() => {
-  window.location.href = "booking.html";
-}, 4000);
+  (function () {
+    if (window.top !== window.self) {
+      try {
+        window.top.location.href = window.location.href;
+      } catch (e) {}
+    }
+  })();
 </script>
+<script src="post-pay-redirect.js"></script>
 
+<nav style="padding: 14px 20px;">
+  <h1 class="logo">Karawan Cinema 🎬</h1>
+</nav>
+
+<section class="done-page">
+  <div id="doneLoading" class="done-shell">
+    <div class="done-card">
+      <p class="done-hint" style="margin:0;">جاري تحميل إيصال الحجز…</p>
+    </div>
+  </div>
+
+  <div id="doneErr" class="done-shell" hidden></div>
+
+  <div id="doneContent" class="done-shell" hidden>
+    <div class="done-paid-head">
+      <div class="en">Booking Successful</div>
+      <div class="ar">تم الحجز بنجاح — تم تأكيد الدفع</div>
+      <div class="paid-line">✓ تم الدفع بنجاح · احفظ هذا الإيصال (Screenshot أو طباعة)</div>
+    </div>
+
+    <div class="done-card">
+      <div id="doneBadge" class="done-badge ok"></div>
+      <div class="done-ref-box">
+        <span>رقم مرجع الحجز — اعرضه عند شباك التذاكر</span>
+        <code id="doneRefCode">—</code>
+      </div>
+      <div class="done-rows">
+        <div class="done-row"><span>حالة الدفع</span><strong id="donePayLbl">—</strong></div>
+        <div class="done-row"><span>الفيلم</span><strong id="doneMovie">—</strong></div>
+        <div class="done-row"><span>الحفلة</span><strong id="doneShow">—</strong></div>
+        <div class="done-row"><span>اليوم</span><strong id="doneDay">—</strong></div>
+        <div class="done-row done-seats-row"><span>المقاعد المحجوزة</span><strong id="doneSeats">—</strong></div>
+        <div class="done-row"><span>عدد التذاكر</span><strong id="doneCount">—</strong></div>
+        <div class="done-row"><span>المبلغ</span><strong id="doneTotal">—</strong></div>
+        <div class="done-row"><span>الاسم</span><strong id="doneName">—</strong></div>
+        <div class="done-row"><span>الموبايل</span><strong id="donePhone">—</strong></div>
+      </div>
+      <p id="doneFooter" class="done-hint"></p>
+      <div class="done-actions">
+        <button type="button" id="donePrintBtn">طباعة / PDF</button>
+        <a href="booking.html">حجز جديد</a>
+        <a href="index.html">الرئيسية</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
+<script>
+(function () {
+  var LS_BOOKING = "karawan_last_booking_id";
+
+  function pickRefFromUrl() {
+    var p = new URLSearchParams(window.location.search);
+    var cand = (
+      p.get("ref") ||
+      p.get("bookingId") ||
+      p.get("merchant_order_id") ||
+      p.get("merchantOrderId") ||
+      p.get("order_id") ||
+      p.get("id") ||
+      ""
+    ).trim();
+    if (!cand && window.location.hash) {
+      var h = window.location.hash.replace(/^#/, "");
+      if (h.indexOf("ref=") === 0) cand = decodeURIComponent(h.slice(4)).trim();
+    }
+    return cand;
+  }
+
+  function pickRefStored() {
+    try {
+      var s = (sessionStorage.getItem(LS_BOOKING) || "").trim();
+      if (s) return s;
+    } catch (e) {}
+    try {
+      var exp = parseInt(localStorage.getItem("karawan_receipt_ref_exp") || "0", 10);
+      if (Date.now() > exp) {
+        localStorage.removeItem("karawan_receipt_ref");
+        localStorage.removeItem("karawan_receipt_ref_exp");
+        return "";
+      }
+      return (localStorage.getItem("karawan_receipt_ref") || "").trim();
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function seatsStr(seats) {
+    if (!seats || !seats.length) return "—";
+    return seats.map(function (x) {
+      return String(x).trim().toUpperCase();
+    }).join("، ");
+  }
+
+  function isPaid(d) {
+    return (
+      d.paymentStatus === "paid" ||
+      d.seatsPaid === true ||
+      d.paymentConfirmed === true
+    );
+  }
+
+  var refId = pickRefFromUrl() || pickRefStored();
+  var loadingEl = document.getElementById("doneLoading");
+  var errEl = document.getElementById("doneErr");
+  var contentEl = document.getElementById("doneContent");
+
+  document.getElementById("donePrintBtn").addEventListener("click", function () {
+    window.print();
+  });
+
+  if (!window.db || !window.db.collection) {
+    loadingEl.hidden = true;
+    errEl.hidden = false;
+    errEl.textContent = "لم يتوفر اتصال بقاعدة البيانات. حدّث الصفحة أو افتح الرابط من نفس المتصفح الذي أكملت منه الدفع.";
+    return;
+  }
+
+  if (!refId) {
+    loadingEl.hidden = true;
+    errEl.hidden = false;
+    errEl.innerHTML =
+      "لم يُعثر على رقم الحجز في الرابط. إذا ظهر عندك «تم الدفع» من البنك فقط:<br>" +
+      "١) ارجع لصفحة الموقع من زر الرجوع مرة واحدة؛ أو<br>" +
+      "٢) افتح من الرسالة أو الإيميل إن كان فيه رابط؛ أو<br>" +
+      "٣) تواصل مع السينما واذكر وقت الدفع وبريدك/موبايلك.";
+    return;
+  }
+
+  var badgeEl = document.getElementById("doneBadge");
+  var polls = 0;
+  var pollMax = 24;
+  var docRef = window.db.collection("bookings").doc(refId);
+
+  function paint(d) {
+    document.getElementById("doneRefCode").textContent = refId;
+    document.getElementById("doneMovie").textContent = d.movie || "—";
+    document.getElementById("doneShow").textContent = d.showtime || "—";
+    document.getElementById("doneDay").textContent = d.day || "—";
+    document.getElementById("doneSeats").textContent = seatsStr(d.seats);
+    document.getElementById("doneCount").textContent = String(
+      d.ticketCount || (d.seats && d.seats.length) || "0"
+    );
+    document.getElementById("doneTotal").textContent =
+      (d.totalPrice != null ? d.totalPrice : "—") + " ج.م";
+    document.getElementById("doneName").textContent = d.customerName || "—";
+    document.getElementById("donePhone").textContent = d.customerPhone || "—";
+
+    var st = String(d.paymentStatus || "").toLowerCase();
+    var payLbl = document.getElementById("donePayLbl");
+    var footer = document.getElementById("doneFooter");
+
+    if (isPaid(d)) {
+      badgeEl.className = "done-badge ok";
+      badgeEl.textContent = "✓ تأكيد: مدفوع — هذا إيصالك للعرض بالسينما";
+      payLbl.textContent = "مدفوع";
+      footer.textContent = "";
+    } else if (st === "pending_hold") {
+      badgeEl.className = "done-badge wait";
+      badgeEl.textContent = "جاري ربط الدفع بحجزك — انتظر قليلًا ثم حدّث الصفحة";
+      payLbl.textContent = "قيد التأكيد";
+      footer.textContent =
+        "البنك أظهر النجاح، ونحن نحدّث الحجز. إذا ظلّت هذه الرسالة دقيقتين، احتفظ برقم المرجع أعلاه واطلب المساعدة من شباك التذاكر.";
+    } else if (st === "expired") {
+      badgeEl.className = "done-badge bad";
+      badgeEl.textContent = "انتهت مهلة الحجز — إن كنت دفعت أحضر إثبات الدفع ورقم المرجع";
+      payLbl.textContent = "منتهي";
+      footer.textContent = "";
+    } else {
+      badgeEl.className = "done-badge wait";
+      badgeEl.textContent = "مراجعة حالة الدفع";
+      payLbl.textContent = d.paymentStatus || "—";
+      footer.textContent = "احفظ رقم المرجع والمقاعد؛ إن لم يظهر «مدفوع» حدّث الصفحة خلال دقيقة.";
+    }
+  }
+
+  function loadOnce() {
+    docRef
+      .get({ source: polls === 0 ? "server" : "default" })
+      .then(function (snap) {
+        loadingEl.hidden = true;
+        if (!snap.exists) {
+          errEl.hidden = false;
+          errEl.textContent =
+            "لا توجد بيانات حجز لهذا المرجع بعد. انتظر ثواني ثم اضغط تحديث، أو تأكد من الرابط.";
+          return;
+        }
+        contentEl.hidden = false;
+        var data = snap.data() || {};
+        paint(data);
+        try {
+          sessionStorage.removeItem("karawan_after_paymob");
+          localStorage.removeItem("karawan_after_paymob");
+          localStorage.removeItem("karawan_receipt_ref");
+          localStorage.removeItem("karawan_receipt_ref_exp");
+        } catch (e) {}
+
+        var pending =
+          String(data.paymentStatus || "").toLowerCase() === "pending_hold";
+        if (!isPaid(data) && pending && polls < pollMax) {
+          polls += 1;
+          setTimeout(loadOnce, 2500);
+        }
+      })
+      .catch(function () {
+        loadingEl.hidden = true;
+        errEl.hidden = false;
+        errEl.textContent = "خطأ أثناء التحميل. حدّث الصفحة (F5).";
+      });
+  }
+
+  loadOnce();
+})();
+</script>
 </body>
 </html>

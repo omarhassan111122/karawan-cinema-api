@@ -2,10 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Contact</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<script src="post-pay-redirect.js"></script>
 
 <nav>
   <h1 class="logo">Karawan Cinema 🎬</h1>
@@ -15,6 +17,7 @@
     <li><a href="booking.html">Booking</a></li>
     <li><a href="locations.html">Locations</a></li>
     <li><a href="contact.html">Contact</a></li>
+    <li class="admin-nav-item" hidden><a href="admin-bookings.html">Admin</a></li>
   </ul>
 </nav>
 <button class="back-nav-btn" type="button" onclick="if (history.length > 1) { history.back(); } else { window.location.href='index.html'; }">⟵ Back</button>
@@ -32,7 +35,9 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="firebase.js"></script>
+<script src="admin-nav.js"></script>
 <script>
   async function loadContactData() {
     if (!window.db || typeof window.fetchMergedSiteLocationData !== "function") return;
