@@ -250,7 +250,10 @@
 
   <div class="booking-layout" id="bookingLayout">
     <div class="seat-map-card">
-      <div class="seat-map" id="seatMap"></div>
+      <p class="seat-pan-hint" id="seatPanHint" aria-hidden="true">↔ اسحب يمين/شمال لرؤية كل المقاعد</p>
+      <div class="seat-map-scroll" role="region" aria-label="خريطة المقاعد — اسحب أفقيا">
+        <div class="seat-map" id="seatMap"></div>
+      </div>
       <div class="screen-curve screen-front">CINEMA SCREEN</div>
     </div>
 
@@ -268,6 +271,7 @@
         <div><i class="dot available"></i> متاح</div>
         <div><i class="dot reserved"></i> محجوز</div>
         <div><i class="dot selected"></i> مختار</div>
+        <div><i class="dot blocked"></i> غير متاح</div>
       </div>
       <p id="seatRuleMsg" class="seat-rule-msg"></p>
 
@@ -578,19 +582,19 @@
 
     const topLeft = `
       <div class="zone zone-top-left">
-        <div class="row-grid cols-8">
-          ${buildRangeReverse("C", 5, 19)}
-          ${buildRangeReverse("D", 5, 19)}
+        <div class="row-grid cols-8 row-grid--stacked">
+          <div class="seat-line cols-8">${buildRangeReverse("C", 5, 19)}</div>
+          <div class="seat-line cols-8">${buildRangeReverse("D", 5, 19)}</div>
         </div>
       </div>
     `;
 
     const topRight = `
       <div class="zone zone-top-right">
-        <div class="row-grid cols-8">
-          ${buildRange("B", 6, 20)}
-          ${buildRange("C", 6, 20)}
-          ${buildRange("D", 6, 20)}
+        <div class="row-grid cols-8 row-grid--stacked">
+          <div class="seat-line cols-8">${buildRange("B", 6, 20)}</div>
+          <div class="seat-line cols-8">${buildRange("C", 6, 20)}</div>
+          <div class="seat-line cols-8">${buildRange("D", 6, 20)}</div>
         </div>
       </div>
     `;
@@ -622,6 +626,70 @@
         <div class="zone zone-bottom-left"><div class="row-stack">${bottomLeft}</div></div>
       </div>
     `;
+    applyPermanentBlocks();
+  }
+
+  /** مقاعد غير قابلة للبيع (ثابتة في الخريطة). صف D: الأرقام من 6 إلى 20 غير متاحة. */
+  function isBlockedSeat(code) {
+    const m = String(code || "")
+      .trim()
+      .toUpperCase()
+      .match(/^([A-Z]+)(\d+)$/);
+    if (!m) return false;
+    const row = m[1];
+    const n = parseInt(m[2], 10);
+    if (row !== "D" || !Number.isFinite(n)) return false;
+    return n >= 6 && n <= 20;
+  }
+
+  function applyPermanentBlocks() {
+    document.querySelectorAll(".seat-map .seat").forEach((el) => {
+      const code = el.dataset.seat;
+      if (!isBlockedSeat(code)) return;
+      el.classList.remove("available", "selected");
+      el.classList.add("blocked");
+      el.setAttribute("title", "غير متاح");
+      el.setAttribute("aria-disabled", "true");
+    });
+  }
+
+  function onSeatClick() {
+    const seat = this;
+    if (seat.classList.contains("blocked")) return;
+    if (seat.classList.contains("reserved")) return;
+    const line = seat.closest(".seat-line");
+    if (!line) return;
+
+    const seatsInLine = Array.from(line.querySelectorAll(".seat"));
+    const index = seatsInLine.indexOf(seat);
+    const isSelecting = !seat.classList.contains("selected");
+
+    const selectedIndices = seatsInLine
+      .map((s, i) => (s.classList.contains("selected") ? i : -1))
+      .filter((i) => i !== -1);
+
+    const nextSelected = isSelecting ? [...selectedIndices, index] : selectedIndices.filter((i) => i !== index);
+
+    if (!isValidContiguousSelection(nextSelected, seatsInLine)) {
+      setSeatRuleMsg("اختار مقاعد متجاورة فقط، ولا تترك كرسيًا فاضيًا بين المقاعد.");
+      return;
+    }
+
+    if (createsSingleSeatGap(nextSelected, seatsInLine)) {
+      setSeatRuleMsg("غير مسموح تسيب كرسي واحد فاضي بين حجوزات. اختار المقاعد بشكل متصل.");
+      return;
+    }
+
+    if (isSelecting) {
+      seat.classList.remove("available");
+      seat.classList.add("selected");
+    } else {
+      seat.classList.remove("selected");
+      seat.classList.add("available");
+    }
+
+    clearSeatRuleMsg();
+    updateTotal();
   }
 
   function updateTotal() {
@@ -651,8 +719,10 @@
     const touchesRightEdge = blockEnd === seatsInLine.length - 1;
     const leftNeighbor = seatsInLine[blockStart - 1];
     const rightNeighbor = seatsInLine[blockEnd + 1];
-    const touchesReservedLeft = leftNeighbor?.classList.contains("reserved");
-    const touchesReservedRight = rightNeighbor?.classList.contains("reserved");
+    const touchesReservedLeft =
+      leftNeighbor?.classList.contains("reserved") || leftNeighbor?.classList.contains("blocked");
+    const touchesReservedRight =
+      rightNeighbor?.classList.contains("reserved") || rightNeighbor?.classList.contains("blocked");
 
     // الاختيار يكون من طرف الصف أو ملاصقًا لحجز موجود.
     return touchesLeftEdge || touchesRightEdge || touchesReservedLeft || touchesReservedRight;
@@ -662,7 +732,7 @@
     const selectedSet = new Set(nextSelected);
 
     const unavailable = seatsInLine.map((seat, index) => {
-      if (seat.classList.contains("reserved")) return true;
+      if (seat.classList.contains("reserved") || seat.classList.contains("blocked")) return true;
       return selectedSet.has(index);
     });
 
@@ -685,6 +755,7 @@
 
   function clearSeatStates() {
     document.querySelectorAll(".seat-map .seat").forEach((seat) => {
+      if (seat.classList.contains("blocked")) return;
       seat.classList.remove("selected", "reserved");
       seat.classList.add("available");
     });
@@ -717,6 +788,7 @@
     const reservedSet = new Set(seatCodes);
     document.querySelectorAll(".seat-map .seat").forEach((seat) => {
       const seatCode = seat.dataset.seat;
+      if (seat.classList.contains("blocked")) return;
       if (reservedSet.has(seatCode)) {
         seat.classList.remove("selected", "available");
         seat.classList.add("reserved");
@@ -1038,6 +1110,11 @@
   const paymentHint = document.getElementById("paymentHint");
 
   buildMap();
+  seatMap.addEventListener("click", function (ev) {
+    const seat = ev.target && ev.target.closest ? ev.target.closest(".seat") : null;
+    if (!seat || !seatMap.contains(seat)) return;
+    onSeatClick.call(seat, ev);
+  });
   setShowtimeOptions(defaultShowtimes);
   loadMoviesFromFirebase();
   loadQnbPaymentSettings();
@@ -1048,47 +1125,6 @@
   });
 
   updateTotal();
-
-  document.querySelectorAll(".seat-map .seat").forEach((seat) => {
-    seat.addEventListener("click", () => {
-      if (seat.classList.contains("reserved")) return;
-      const line = seat.closest(".seat-line");
-      if (!line) return;
-
-      const seatsInLine = Array.from(line.querySelectorAll(".seat"));
-      const index = seatsInLine.indexOf(seat);
-      const isSelecting = !seat.classList.contains("selected");
-
-      const selectedIndices = seatsInLine
-        .map((s, i) => (s.classList.contains("selected") ? i : -1))
-        .filter((i) => i !== -1);
-
-      const nextSelected = isSelecting
-        ? [...selectedIndices, index]
-        : selectedIndices.filter((i) => i !== index);
-
-      if (!isValidContiguousSelection(nextSelected, seatsInLine)) {
-        setSeatRuleMsg("اختار مقاعد متجاورة فقط، ولا تترك كرسيًا فاضيًا بين المقاعد.");
-        return;
-      }
-
-      if (createsSingleSeatGap(nextSelected, seatsInLine)) {
-        setSeatRuleMsg("غير مسموح تسيب كرسي واحد فاضي بين حجوزات. اختار المقاعد بشكل متصل.");
-        return;
-      }
-
-      if (isSelecting) {
-        seat.classList.remove("available");
-        seat.classList.add("selected");
-      } else {
-        seat.classList.remove("selected");
-        seat.classList.add("available");
-      }
-
-      clearSeatRuleMsg();
-      updateTotal();
-    });
-  });
 
   finalConfirmBtn.addEventListener("click", async () => {
     if (!isGoogleAuthRequiredSatisfied()) {

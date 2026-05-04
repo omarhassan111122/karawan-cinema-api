@@ -465,6 +465,35 @@ button {
   gap: 14px;
 }
 
+.row-grid.row-grid--stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.seat-map-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  padding-bottom: 4px;
+}
+
+.seat-map-scroll .seat-map {
+  min-width: min(1180px, max-content);
+}
+
+.seat-pan-hint {
+  display: none;
+  font-size: 12px;
+  color: #475569;
+  text-align: center;
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
 .map-row {
   display: flex;
   gap: 18px;
@@ -554,6 +583,21 @@ button {
   color: #fff;
 }
 
+.seat-map .seat.blocked {
+  background: repeating-linear-gradient(
+    135deg,
+    #9ca3af,
+    #9ca3af 4px,
+    #d1d5db 4px,
+    #d1d5db 8px
+  );
+  color: #374151;
+  cursor: not-allowed;
+  pointer-events: none;
+  border-color: #6b7280;
+  opacity: 0.92;
+}
+
 .booking-panel {
   background: #eceff3;
   border: 1px solid #b8c1cc;
@@ -596,6 +640,17 @@ button {
   height: 16px;
   border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 2px;
+}
+
+.dot.blocked {
+  background: repeating-linear-gradient(
+    135deg,
+    #9ca3af,
+    #9ca3af 3px,
+    #d1d5db 3px,
+    #d1d5db 6px
+  );
+  border-color: #6b7280;
 }
 
 .dot.available { background: #fff; }
@@ -888,7 +943,7 @@ button {
     margin: 0 auto;
   }
 
-  .seat-map {
+  .seat-map-scroll {
     overflow-x: auto;
     padding-bottom: 8px;
   }
@@ -899,6 +954,12 @@ button {
 
   .zone {
     min-width: max-content;
+  }
+}
+
+@media (max-width: 900px) {
+  .seat-pan-hint {
+    display: block;
   }
 }
 
@@ -1517,6 +1578,9 @@ button {
 @media (max-width: 768px) {
   nav {
     padding: 14px 16px;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: 0 8px 22px rgba(2, 6, 23, 0.42);
   }
 
   .logo {
@@ -1634,6 +1698,11 @@ button {
 
   .booking-panel {
     padding: 12px;
+    box-shadow: 0 6px 14px rgba(2, 6, 23, 0.12);
+  }
+
+  .seat-map-card {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.14);
   }
 
   .booking-panel h3 {
@@ -1711,5 +1780,16 @@ button {
 
   .instapay-copy-btn {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
