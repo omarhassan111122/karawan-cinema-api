@@ -63,8 +63,10 @@ initFirebaseAdmin();
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname));
-
+app.use(express.static(path.join(__dirname, "public")));
+app.get("/payment-done.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "payment-done.html"));
+});
 app.get("/api/payment/config", (_req, res) => {
   res.json({
     paymob: paymobGateway.isPaymobConfigured() && !!firestoreAdmin,

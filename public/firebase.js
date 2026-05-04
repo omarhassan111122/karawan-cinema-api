@@ -7,18 +7,36 @@ const firebaseConfig = {
   appId: "1:279453120513:web:3f351a92b2e6302e09e800"
 };
 
-window.isFirebaseConfigured = !!firebaseConfig.apiKey;
-
+window.isFirebaseConfigured = false;
+window.db = null;
+window.auth = null;
 // Local: leave empty string (same origin). Hosting: set to deployed backend URL.
 window.API_BASE_URL = "https://karawan-cinema-api-production.up.railway.app";
 
-if (window.isFirebaseConfigured) {
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
+try {
+  if (typeof firebase === 'undefined') {
+    console.warn('Firebase SDK not loaded. Check script tags.');
+  } else {
+    window.isFirebaseConfigured = !!firebaseConfig.apiKey;
+    if (window.isFirebaseConfigured) {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      window.db = firebase.firestore();
+      // Only initialize auth if the auth SDK is loaded
+      if (firebase.auth) {
+        window.auth = firebase.auth();
+      } else {
+        window.auth = null;
+      }
+      console.log('Firebase initialized successfully for project:', firebaseConfig.projectId);
+    }
   }
-  window.db = firebase.firestore();
-} else {
+} catch (error) {
+  console.error('Firebase initialization error:', error);
+  window.isFirebaseConfigured = false;
   window.db = null;
+  window.auth = null;
 }
 
 (function () {

@@ -78,12 +78,13 @@
     card.className = "movie-card";
     const title = movie.title || movie.name || "Untitled Movie";
     const category = movie.category || movie.genre || "Cinema";
-    const image = movie.imageUrl || movie.posterUrl || movie.image || "images/movie1.jpg";
+    // Prioritize 'image' field as user confirmed, then fallback to others
+    const image = movie.image || movie.imageUrl || movie.posterUrl || movie.poster || "images/movie1.jpg";
     const statusButton = withBookingButton ? '<a href="booking.html"><button>Book Now</button></a>' : "";
 
     card.innerHTML = `
       <div class="movie-card-poster">
-        <img src="${image}" alt="${title} poster" loading="lazy" decoding="async">
+        <img src="${image}" alt="${title} poster" loading="lazy" decoding="async" onerror="this.src='images/movie1.jpg'">
         <span class="movie-tag">${category}</span>
       </div>
       <h3>${title}</h3>
@@ -115,18 +116,27 @@
   }
 
   async function loadMovies() {
+    console.log("Firebase configured:", isFirebaseConfigured);
+    console.log("DB object:", db);
+    
     if (!isFirebaseConfigured || !db) {
+      console.warn("Firebase not configured, showing fallback cards");
       showFallbackCards();
       return;
     }
 
     try {
+      console.log("Loading movies from Firebase...");
       const snapshot = await db.collection("movies").get();
+      console.log("Movies snapshot empty:", snapshot.empty);
+      console.log("Movies snapshot size:", snapshot.size);
+      
       const nowShowing = [];
       const comingSoon = [];
 
       snapshot.forEach((doc) => {
         const movie = doc.data();
+        console.log("Movie document:", doc.id, movie);
         const status = (movie.status || "now").toLowerCase().trim();
         const isComingSoon = ["coming", "coming soon", "soon"].includes(status);
         if (isComingSoon) {
@@ -136,6 +146,9 @@
         }
       });
 
+      console.log("Now showing count:", nowShowing.length);
+      console.log("Coming soon count:", comingSoon.length);
+
       nowShowingRow.innerHTML = "";
       comingSoonRow.innerHTML = "";
 
@@ -143,10 +156,13 @@
       comingSoon.slice(0, 6).forEach((movie) => comingSoonRow.appendChild(createMovieCard(movie, false)));
 
       if (!nowShowing.length && !comingSoon.length) {
+        console.log("No movies found, showing fallback cards");
         showFallbackCards();
       }
     } catch (error) {
       console.error("Error loading movies:", error);
+      console.error("Error code:", error.code);
+      console.error("Error message:", error.message);
       showFallbackCards();
     }
   }

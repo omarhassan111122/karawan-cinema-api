@@ -1,33 +1,72 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>اكتمال الدفع</title>
-  <link rel="stylesheet" href="css/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تم الدفع بنجاح</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: linear-gradient(135deg, #0f0f0f, #1a0000);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  text-align: center;
+}
+
+.card {
+  background: #1c1c1c;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 0 20px rgba(255,0,0,0.3);
+  max-width: 400px;
+}
+
+h1 {
+  color: #00e676;
+  margin-bottom: 10px;
+}
+
+p {
+  color: #ccc;
+  margin-bottom: 20px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  background: #e53935;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.btn:hover {
+  background: #c62828;
+}
+</style>
+
 </head>
+
 <body>
 
-<nav>
-  <h1 class="logo">Karawan Cinema 🎬</h1>
-  <ul>
-    <li><a href="index.html">Home</a></li>
-    <li><a href="booking.html">Booking</a></li>
-  </ul>
-</nav>
+<div class="card">
+  <h1>✔ تم الدفع بنجاح</h1>
+  <p>شكراً لاستخدامك Karawan Cinema 🎬</p>
+  <p>سيتم تحويلك تلقائيًا بعد ثواني...</p>
 
-<section class="instapay-pay-page">
-  <div class="instapay-pay-card">
-    <h2>تمت معالجة الدفع</h2>
-    <p class="instapay-pay-lead">
-      لو أكّدت الدفع من صفحة QNB (زر «أكتم الدفع»)، يكون حجزك مُحدَّثًا في Firebase.
-      في حالة إغلاق الصفحة قبل التأكيد، راجع الحجز من لوحة الأدمن.
-    </p>
-    <a href="booking.html" class="instapay-done-link">العودة لصفحة الحجز</a>
-  </div>
-</section>
+  <a href="booking.html" class="btn">العودة للحجز</a>
+</div>
 
-<footer class="site-footer"><p>Karawan Cinema</p></footer>
+<script>
+setTimeout(() => {
+  window.location.href = "booking.html";
+}, 4000);
+</script>
 
 </body>
 </html>

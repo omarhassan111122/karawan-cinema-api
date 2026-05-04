@@ -17,28 +17,52 @@
 
   <div class="prebooking-card">
     <h3>1) اختار الفيلم والحفلة وأكّد بياناتك</h3>
+    
+    <div id="authSection">
+      <button class="google-signin-btn" id="googleSignInBtn" type="button">
+        <svg viewBox="0 0 24 24" width="20" height="20">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        تسجيل الدخول عبر Google
+      </button>
+    </div>
+
+    <div id="userInfoSection" style="display: none;">
+      <div class="user-info-display">
+        <img id="userPhoto" src="" alt="User Photo">
+        <div class="user-details">
+          <div class="user-name" id="userName"></div>
+          <div class="user-email" id="userEmail"></div>
+        </div>
+        <button class="logout-btn" id="logoutBtn" type="button">تسجيل خروج</button>
+      </div>
+    </div>
+
     <div class="prebooking-grid">
       <label>
-        الفيلم
+        <span>🎬 الفيلم</span>
         <select id="movieSelect">
           <option value="">-- اختار الفيلم --</option>
         </select>
       </label>
 
       <label>
-        الحفلة
+        <span>🕐 الحفلة</span>
         <select id="showtimeSelect">
           <option value="">-- اختار الحفلة --</option>
         </select>
       </label>
 
       <label>
-        الاسم
+        <span>👤 الاسم</span>
         <input type="text" id="customerName" placeholder="اكتب اسمك">
       </label>
 
       <label>
-        رقم الموبايل
+        <span>📱 رقم الموبايل</span>
         <input type="tel" id="customerPhone" placeholder="01XXXXXXXXX">
       </label>
     </div>
@@ -77,7 +101,8 @@
         <strong id="totalPrice">0 EGP</strong>
       </div>
 
-      <p class="instapay-hint">بعد «تأكيد الحجز» المقاعد تُقفل <strong>بالأحمر</strong> لمدة <strong>5 دقائق</strong>. سيتم تحويلك مباشرة لبوابة <strong>Paymob</strong> للدفع بالفيزا/ماستركارد. إذا لم يكتمل الدفع خلال <strong>5 دقائق</strong> تتحرر المقاعد تلقائيًا.</p>
+
+      <p class="instapay-hint" id="paymentHint">بعد «تأكيد الحجز» المقاعد تُقفل <strong>بالأحمر</strong> لمدة <strong>5 دقائق</strong>. سيتم تحويلك مباشرة لبوابة <strong>Paymob</strong> للدفع بالفيزا/ماستركارد. إذا لم يكتمل الدفع خلال <strong>5 دقائق</strong> تتحرر المقاعد تلقائيًا.</p>
 
       <button type="button" id="finalConfirmBtn">تأكيد الحجز</button>
     </aside>
@@ -87,6 +112,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="firebase.js"></script>
 <script>
   const db = window.db;
@@ -563,6 +589,94 @@
       return;
     }
 
+    // Check if showtime is at least 30 minutes away
+    const now = new Date();
+    
+    // Parse showtime (format: "HH:MM AM/PM" like "01:00 PM", "04:30 PM")
+    function parseShowtime(timeStr, baseDate) {
+      const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm|ص|م)$/i);
+      if (!match) return null;
+      
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      const period = match[3].toUpperCase();
+      
+      // Convert to 24-hour format
+      if (period === 'AM' || period === 'ص') {
+        if (hours === 12) hours = 0;
+      } else if (period === 'PM' || period === 'م') {
+        if (hours !== 12) hours += 12;
+      }
+      
+      const result = new Date(baseDate);
+      result.setHours(hours, minutes, 0, 0);
+      
+      return result;
+    }
+    
+    const showtimeToday = parseShowtime(showtime, now);
+    if (!showtimeToday) {
+      prebookingMsg.textContent = "صيغة وقت الحفلة غير صحيحة. استخدم صيغة مثل 01:00 PM";
+      prebookingMsg.style.color = "#f87171";
+      return;
+    }
+
+    // Determine if the showtime is today or tomorrow
+    // Only late night shows (like 12:00 AM, 01:00 AM, 02:00 AM) can be for tomorrow
+    // When it's currently PM (afternoon/evening), earlier PM times are today's past shows
+    let showtimeDate;
+    let isTomorrow = false;
+    
+    // Get current hour in 24h format
+    const currentHour24 = now.getHours();
+    
+    // Parse the showtime period (AM/PM)
+    const showtimePeriodMatch = showtime.match(/(AM|PM|am|pm|ص|م)/i);
+    const showtimePeriod = showtimePeriodMatch ? showtimePeriodMatch[1].toUpperCase() : '';
+    
+    // Parse showtime hour in 24h format
+    const showtimeHourMatch = showtime.match(/^(\d{1,2}):(\d{2})/);
+    let showtimeHour24 = showtimeHourMatch ? parseInt(showtimeHourMatch[1], 10) : 0;
+    if (showtimePeriod === 'PM' || showtimePeriod === 'م') {
+      if (showtimeHour24 !== 12) showtimeHour24 += 12;
+    } else if (showtimePeriod === 'AM' || showtimePeriod === 'ص') {
+      if (showtimeHour24 === 12) showtimeHour24 = 0;
+    }
+    
+    // Logic: If current time is PM (12:00 PM - 11:59 PM) and showtime is AM (12:00 AM - 11:59 AM),
+    // then the show is for tomorrow
+    // Otherwise, the show is for today
+    const isCurrentTimePM = currentHour24 >= 12; // 12 PM or later
+    const isShowtimeAM = showtimePeriod === 'AM' || showtimePeriod === 'ص';
+    
+    if (isCurrentTimePM && isShowtimeAM) {
+      // Show is for tomorrow (e.g., 12:00 AM when it's currently 10:00 PM)
+      showtimeDate = new Date(showtimeToday);
+      showtimeDate.setDate(showtimeDate.getDate() + 1);
+      isTomorrow = true;
+    } else {
+      // Show is for today
+      showtimeDate = showtimeToday;
+    }
+
+    const timeDiff = showtimeDate.getTime() - now.getTime();
+    const minutesDiff = timeDiff / (1000 * 60);
+
+    // Block booking if less than 30 minutes before showtime
+    if (minutesDiff < 30) {
+      if (minutesDiff < 0) {
+        // Show has already started
+        const minutesAgo = Math.floor(Math.abs(minutesDiff));
+        prebookingMsg.textContent = `⛔ الحفلة دي بدأت من ${minutesAgo} دقيقة. مفيش حجز أونلاين للحفلات اللي بدأت. اختر حفلة تانية.`;
+      } else {
+        // Show is starting in less than 30 minutes
+        const minutesLeft = Math.floor(minutesDiff);
+        prebookingMsg.textContent = `⛔ الحجز الأونلاين يقف قبل الحفلة بـ30 دقيقة. الحفلة دي هتبدأ بعد ${minutesLeft} دقيقة بس. من فضلك اختر حفلة تانية أو روح للسينما.`;
+      }
+      prebookingMsg.style.color = "#f87171";
+      return;
+    }
+
     document.getElementById("summaryMovie").textContent = movie;
     document.getElementById("summaryShowtime").textContent = showtime;
     document.getElementById("summaryDay").textContent = formatToday();
@@ -578,6 +692,8 @@
     subscribeReservedSeats(movie, showtime, document.getElementById("summaryDay").textContent);
     bookingLayout.scrollIntoView({ behavior: "smooth", block: "start" });
   });
+
+  const paymentHint = document.getElementById("paymentHint");
 
   buildMap();
   setShowtimeOptions(defaultShowtimes);
@@ -639,12 +755,18 @@
       return;
     }
 
+    const selectedPaymentMethod = "paymob";
+
     finalConfirmBtn.disabled = true;
 
     let bookingDataForPay = null;
 
     try {
       const totalAmount = selectedSeats.length * seatPrice;
+
+      // Get email from logged-in user or empty string
+      const currentUser = firebase.auth().currentUser;
+      const customerEmailValue = currentUser ? currentUser.email : "";
 
       const bookingPayload = {
         movie: document.getElementById("summaryMovie").textContent,
@@ -653,11 +775,12 @@
         bookingKey: activeBookingKey,
         customerName: document.getElementById("summaryName").textContent,
         customerPhone: document.getElementById("summaryPhone").textContent,
+        customerEmail: customerEmailValue,
         seats: selectedSeats.map((seat) => seat.dataset.seat),
         ticketCount: selectedSeats.length,
         totalPrice: totalAmount,
-        paymentMethod: "paymob",
-        paymentStatus: "pending_payment",
+        paymentMethod: selectedPaymentMethod,
+        paymentStatus: "pending_hold",
         holdExpiresAt: firebase.firestore.Timestamp.fromMillis(Date.now() + PAY_HOLD_MS),
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       };
@@ -674,38 +797,36 @@
           return;
         }
 
-        if (docId) {
-          try {
-            const cfgRes = await fetch(apiUrl("/api/payment/config"));
-            const cfg = cfgRes.ok ? await cfgRes.json() : {};
-            if (cfg && cfg.paymob) {
-              const r = await fetch(apiUrl("/api/paymob/session"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ bookingId: docId })
-              });
-              const j = await r.json().catch(function () {
-                return {};
-              });
-              if (r.ok && j && j.url) {
-                bookingState.textContent = "جاري تحويلك لبوابة الدفع الإلكتروني (Paymob)…";
-                window.location.assign(j.url);
-                return;
-              }
-              console.warn("Paymob session failed:", j.error || r.statusText || r.status);
-              bookingState.textContent =
-                "تعذر فتح Paymob: " + (j.error || r.statusText || "تحقق من إعدادات السيرفر");
-              return;
-            } else {
-              bookingState.textContent =
-                "Paymob غير مفعّل على السيرفر. راجع مفاتيح .env و Firebase Admin ثم أعد المحاولة.";
+        try {
+          const cfgRes = await fetch(apiUrl("/api/payment/config"));
+          const cfg = cfgRes.ok ? await cfgRes.json() : {};
+          if (cfg && cfg.paymob) {
+            const r = await fetch(apiUrl("/api/paymob/session"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ bookingId: docId })
+            });
+            const j = await r.json().catch(function () {
+              return {};
+            });
+            if (r.ok && j && j.url) {
+              bookingState.textContent = "جاري تحويلك لبوابة الدفع الإلكتروني (Paymob)…";
+              window.location.assign(j.url);
               return;
             }
-          } catch (e) {
-            console.warn("Payment gateway unavailable.", e);
-            bookingState.textContent = "تعذر الاتصال ببوابة Paymob. تأكد أن السيرفر يعمل.";
+            console.warn("Paymob session failed:", j.error || r.statusText || r.status);
+            bookingState.textContent =
+              "تعذر فتح Paymob: " + (j.error || r.statusText || "تحقق من إعدادات السيرفر");
+            return;
+          } else {
+            bookingState.textContent =
+              "Paymob غير مفعّل على السيرفر. راجع مفاتيح .env و Firebase Admin ثم أعد المحاولة.";
             return;
           }
+        } catch (e) {
+          console.warn("Payment gateway unavailable.", e);
+          bookingState.textContent = "تعذر الاتصال ببوابة Paymob. تأكد أن السيرفر يعمل.";
+          return;
         }
       }
 
@@ -719,6 +840,7 @@
       }
 
       const docRef = await bookingsRef.add(bookingPayload);
+      window.currentBookingId = docRef.id;
       selectedSeats.forEach((seat) => {
         seat.classList.remove("selected", "available");
         seat.classList.add("reserved");
@@ -750,6 +872,98 @@
       finalConfirmBtn.disabled = false;
     }
   });
+
+  // ===== Google Sign-In Authentication =====
+  const authSection = document.getElementById("authSection");
+  const userInfoSection = document.getElementById("userInfoSection");
+  const googleSignInBtn = document.getElementById("googleSignInBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const userPhoto = document.getElementById("userPhoto");
+  const userName = document.getElementById("userName");
+  const userEmail = document.getElementById("userEmail");
+  const customerName = document.getElementById("customerName");
+
+  // Check auth state on page load
+  function checkAuthState() {
+    if (window.auth) {
+      firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+          showUserInfo(user);
+        } else {
+          showSignInButton();
+        }
+      });
+    }
+  }
+
+  function showUserInfo(user) {
+    authSection.style.display = "none";
+    userInfoSection.style.display = "block";
+    userPhoto.src = user.photoURL || "https://ui-avatars.com/api/?name=" + encodeURIComponent(user.displayName || "User") + "&background=60a5fa&color=fff";
+    userName.textContent = user.displayName || "مستخدم";
+    userEmail.textContent = user.email;
+    
+    // Auto-fill name if empty
+    if (!customerName.value.trim() && user.displayName) {
+      customerName.value = user.displayName;
+    }
+  }
+
+  function showSignInButton() {
+    authSection.style.display = "block";
+    userInfoSection.style.display = "none";
+  }
+
+  // Google Sign-In
+  googleSignInBtn.addEventListener("click", async () => {
+    if (!window.auth) {
+      prebookingMsg.textContent = "نظام المصادقة غير متاح حالياً.";
+      prebookingMsg.style.color = "#f87171";
+      return;
+    }
+
+    const provider = new firebase.auth.GoogleAuthProvider();
+    
+    try {
+      const result = await firebase.auth().signInWithPopup(provider);
+      const user = result.user;
+      showUserInfo(user);
+      prebookingMsg.textContent = "تم تسجيل الدخول بنجاح!";
+      prebookingMsg.style.color = "#4bd367";
+    } catch (error) {
+      console.error("Google Sign-In Error:", error);
+      const errorCode = error.code;
+      const errorMessage = error.message;
+      
+      if (errorCode === 'auth/popup-closed-by-user') {
+        prebookingMsg.textContent = "تم إغلاق نافذة تسجيل الدخول.";
+      } else if (errorCode === 'auth/popup-blocked') {
+        prebookingMsg.textContent = "تم حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع.";
+      } else {
+        prebookingMsg.textContent = "حدث خطأ أثناء تسجيل الدخول: " + errorMessage;
+      }
+      prebookingMsg.style.color = "#f87171";
+    }
+  });
+
+  // Sign Out
+  logoutBtn.addEventListener("click", async () => {
+    if (!window.auth) return;
+    
+    try {
+      await firebase.auth().signOut();
+      showSignInButton();
+      prebookingMsg.textContent = "تم تسجيل الخروج بنجاح.";
+      prebookingMsg.style.color = "#94a3b8";
+    } catch (error) {
+      console.error("Sign Out Error:", error);
+      prebookingMsg.textContent = "حدث خطأ أثناء تسجيل الخروج.";
+      prebookingMsg.style.color = "#f87171";
+    }
+  });
+
+  // Initialize auth state check
+  checkAuthState();
 </script>
 
 </body>

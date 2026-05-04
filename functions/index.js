@@ -1,32 +1,84 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
+const express = require("express");
+const admin = require("firebase-admin");
 
-const {setGlobalOptions} = require("firebase-functions");
-const {onRequest} = require("firebase-functions/https");
-const logger = require("firebase-functions/logger");
+const app = express();
+app.use(express.json());
 
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
-setGlobalOptions({ maxInstances: 10 });
+// 🔥 Firebase Admin (لازم ملف JSON في نفس الفولدر)
+var serviceAccount = require("./serviceAccountKey.json");
 
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
 
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+const db = admin.firestore();
+
+/* =========================
+   🔵 PAYMOB WEBHOOK
+========================= */
+app.post("/paymob-webhook", async (req, res) => {
+  try {
+    const body = req.body;
+
+    const success =
+      body?.obj?.success === true ||
+      body?.obj?.success === "true";
+
+    const bookingId = body?.obj?.merchant_order_id;
+
+    if (!bookingId) return res.send("NO BOOKING ID");
+
+    const ref = db.collection("bookings").doc(bookingId);
+
+    await ref.update({
+      paymentStatus: success ? "paid" : "failed"
+    });
+
+    console.log("Payment updated:", bookingId, success);
+
+    res.send("OK");
+  } catch (err) {
+    console.error("Webhook error:", err);
+    res.status(500).send("ERROR");
+  }
+});
+
+/* =========================
+   ⏱️ EXPIRE BOOKINGS (5 min)
+========================= */
+app.get("/expire-check", async (req, res) => {
+  try {
+    const now = Date.now();
+
+    const snap = await db.collection("bookings")
+      .where("paymentStatus", "==", "pending_hold")
+      .get();
+
+    await Promise.all(
+      snap.docs.map(async (doc) => {
+        const data = doc.data();
+        const exp = data.holdExpiresAt?.toMillis?.();
+
+        if (exp && exp < now) {
+          await doc.ref.update({
+            paymentStatus: "expired"
+          });
+        }
+      })
+    );
+
+    res.send("expired check done");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("ERROR");
+  }
+});
+
+/* =========================
+   🚀 SERVER START
+========================= */
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
